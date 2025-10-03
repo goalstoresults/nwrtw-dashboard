@@ -52,7 +52,7 @@
     }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
     select {
-      width:100%; padding:10px 12px; color:var(--text); background:#fff;
+      width:100%; padding:10px 12px; color: var(--text); background:#fff;
       border:1px solid var(--border); border-radius:10px;
     }
     .actions { display:flex; gap:10px; }
@@ -75,6 +75,11 @@
     th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
     th { color: var(--muted); font-weight:600; background:#fafbff; }
     tr:nth-child(even) td { background: #fcfdff; }
+    tfoot td {
+      background:#f3f6ff; /* subtle blue-ish */
+      font-weight:700;
+      border-top: 2px solid #c7d2fe;
+    }
     .footer {
       margin-top: 10px; font-size:12px; color: var(--muted);
       display:flex; justify-content: space-between; align-items:center; gap: 10px;
@@ -85,6 +90,7 @@
     }
     .error { color:#b91c1c; font-weight:600; }
     .muted { color: var(--muted); }
+    .right { text-align: right; }
   </style>
 </head>
 <body>
@@ -129,8 +135,18 @@
       <div id="progress" class="bar"></div>
 
       <table>
-        <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
+        <thead>
+          <tr><th>Program</th><th>Status</th><th>Count</th></tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="3" class="muted">No results</td></tr>
+        </tbody>
+        <tfoot id="tfoot" style="display:none;">
+          <tr>
+            <td class="right" colspan="2">Total</td>
+            <td id="totalCell">0</td>
+          </tr>
+        </tfoot>
       </table>
 
       <div class="footer">
@@ -146,7 +162,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.0'; // bump this when you release
+    const curr_version = '1.1'; // bump this when you release
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev'; // CORS-based API
 
     // Version line
@@ -170,6 +186,8 @@
     const programEl = document.getElementById('program');
     const recordTypeEl = document.getElementById('recordType');
     const tbody = document.getElementById('tbody');
+    const tfoot = document.getElementById('tfoot');
+    const totalCell = document.getElementById('totalCell');
     const meta = document.getElementById('meta');
     const source = document.getElementById('source');
     const progress = document.getElementById('progress');
@@ -207,8 +225,11 @@
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         const rows = j.rows || [];
+
         if (!rows.length) {
           tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
+          tfoot.style.display = 'none';
+          totalCell.textContent = '0';
         } else {
           tbody.innerHTML = rows.map(x => `
             <tr class="row">
@@ -216,12 +237,18 @@
               <td>${x.status}</td>
               <td>${x.count}</td>
             </tr>`).join('');
+          const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
+          totalCell.textContent = total;
+          tfoot.style.display = '';
         }
-        const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
-        meta.textContent = rows.length ? `${total} total across ${rows.length} groups` : '';
+
+        const totalShown = Number(totalCell.textContent || '0');
+        meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
         source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
+        tfoot.style.display = 'none';
+        totalCell.textContent = '0';
         meta.textContent = '';
         source.textContent = '';
       } finally {
@@ -234,13 +261,15 @@
       programEl.value = 'ALL';
       recordTypeEl.value = 'ALL';
       tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
+      tfoot.style.display = 'none';
+      totalCell.textContent = '0';
       meta.textContent = '';
       source.textContent = '';
     });
 
     (async function init(){
       await fetchPrograms();
-      // do NOT auto-load; user will click "Load Results"
+      // Wait for user to click "Load Results"
     })();
   </script>
 </body>
