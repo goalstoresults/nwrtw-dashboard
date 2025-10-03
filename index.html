@@ -22,7 +22,6 @@
     .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
 
-    /* Filters */
     .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:start; }
     .filter-field { display:flex; flex-direction:column; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
@@ -53,10 +52,10 @@
     .right { text-align:right; }
 
     /* Donut (SVG) */
-    .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
+    .chart-wrap { margin-top:14px; display:none; }
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
-    .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
+    .donut-box { position:relative; width:180px; height:180px; }
     .donut-svg { position:absolute; inset:0; }
     .donut-hole {
       position:absolute; inset:26%; background:var(--card); border-radius:50%;
@@ -112,7 +111,7 @@
 
       <div id="progress" class="bar"></div>
 
-      <!-- NEW: As-of timestamp -->
+      <!-- As-of timestamp placeholder -->
       <div id="asOf" class="asof">Current results as of: —</div>
 
       <table>
@@ -148,7 +147,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.13'; // bumped for the as-of timestamp feature
+    const curr_version = '1.13.1';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -191,7 +190,6 @@
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
     }
 
-    // Format local timestamp nicely
     function fmtAsOf(dt) {
       return new Intl.DateTimeFormat(undefined, {
         dateStyle: 'medium',
@@ -217,7 +215,7 @@
       }
     }
 
-    /* ---------- Deterministic color list ---------- */
+    /* ---------- Color palette (unchanged) ---------- */
     const BRAND = ["#2563eb", "#16a34a"];
     const WHEEL_SIZE = 48;
     const wheel = makeWheel(WHEEL_SIZE, 72, 52);
@@ -247,20 +245,17 @@
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
-    // ---------- Donut (SVG arcs with gaps) ----------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
         const s = (r.status ?? "(blank)").toString();
-        const c = Number(r.count || 0);
-        map.set(s, (map.get(s) || 0) + c);
+        theCount = Number(r.count || 0);
+        map.set(s, (map.get(s) || 0) + theCount);
       }
       const total = Array.from(map.values()).reduce((a,b)=>a+b,0);
       const entries = Array.from(map.entries())
         .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
-
-      // Sequential color assignment from the fixed palette
       entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
       return { total, segments: entries };
     }
@@ -273,37 +268,22 @@
         legend.innerHTML = '';
         return;
       }
-
-      // Geometry fits inside viewBox (no clipping)
-      const BOX = 200;
-      const cx = 100, cy = 100;
-      const r = 70;            // radius (smaller)
-      const stroke = 26;       // ring thickness
-      const C = 2 * Math.PI * r;
-      const GAP = 2;           // separation gap along arc
-
+      const BOX = 200, cx = 100, cy = 100, r = 70, stroke = 26, C = 2*Math.PI*r, GAP = 2;
       donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
       donutSvg.innerHTML = '';
-
       let offset = 0;
       for (const seg of segments) {
         const frac = seg.count / total;
         const dash = Math.max(frac * C - GAP, 0);
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', cx);
-        circle.setAttribute('cy', cy);
-        circle.setAttribute('r', r);
-        circle.setAttribute('fill', 'none');
-        circle.setAttribute('stroke', seg.color);
-        circle.setAttribute('stroke-width', stroke.toString());
-        circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', stroke.toString()); circle.setAttribute('stroke-linecap', 'butt');
         circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
-        circle.setAttribute('stroke-dashoffset', (-offset).toString());
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`); circle.setAttribute('stroke-dashoffset', (-offset).toString());
         donutSvg.appendChild(circle);
         offset += dash + GAP;
       }
-
       donutTotal.textContent = total.toString();
       legend.innerHTML = segments.map(seg => {
         const pct = Math.round((seg.count/total)*100);
@@ -311,14 +291,13 @@
                   <span>${seg.status}</span>
                   <span class="pct">${seg.count} (${pct}%)</span></li>`;
       }).join('');
-
       chartSection.style.display = 'block';
     }
 
     async function fetchRows(){
-      // Capture the moment the user requested the data (local time)
+      // Set the as-of timestamp first; guard if the element is missing
       const now = new Date();
-      asOf.textContent = `Current results as of: ${fmtAsOf(now)}`;
+      if (asOf) asOf.textContent = `Current results as of: ${fmtAsOf(now)}`;
 
       setLoading(true);
       try {
@@ -346,7 +325,6 @@
           const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
           totalCell.textContent = total;
           tfoot.style.display = '';
-
           renderDonutSVG(buildDonut(rows));
         }
 
@@ -360,6 +338,8 @@
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
+        // also reset as-of on failure to avoid misleading stamp
+        if (asOf) asOf.textContent = 'Current results as of: —';
       } finally {
         setLoading(false);
       }
@@ -375,7 +355,7 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
-      asOf.textContent = 'Current results as of: —';
+      if (asOf) asOf.textContent = 'Current results as of: —';
     });
 
     (async function init(){
