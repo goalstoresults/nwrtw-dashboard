@@ -37,7 +37,11 @@
     .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
 
     .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; }
+
+    /* As-of line */
+    .asof { font-size:12px; color:var(--muted); margin:8px 0 4px; }
+
+    table { width:100%; border-collapse:collapse; margin-top:6px; }
     th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
     th { color:var(--muted); font-weight:600; background:#fafbff; }
     tr:nth-child(even) td { background:#fcfdff; }
@@ -108,6 +112,9 @@
 
       <div id="progress" class="bar"></div>
 
+      <!-- NEW: As-of timestamp -->
+      <div id="asOf" class="asof">Current results as of: —</div>
+
       <table>
         <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
         <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
@@ -141,7 +148,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.12';
+    const curr_version = '1.13'; // bumped for the as-of timestamp feature
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -176,11 +183,21 @@
     const progress = document.getElementById('progress');
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const asOf = document.getElementById('asOf');
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
       runBtn.disabled = !!on;
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
+    }
+
+    // Format local timestamp nicely
+    function fmtAsOf(dt) {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZoneName: 'short'
+      }).format(dt);
     }
 
     async function fetchPrograms(){
@@ -200,23 +217,13 @@
       }
     }
 
-    /* ---------- Deterministic color list ----------
-       - Reserve the first two "brand" colors.
-       - Generate the rest (46) from an evenly spaced HSL wheel.
-       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
-       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
-    ------------------------------------------------ */
-    const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
+    /* ---------- Deterministic color list ---------- */
+    const BRAND = ["#2563eb", "#16a34a"];
     const WHEEL_SIZE = 48;
-    const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
-    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE); // coprime step
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE);
     const orderedWheel = order.map(i => wheel[i]);
-
-    // Build the final palette: brand colors first, then the ordered wheel excluding near-brand hues
-    const PALETTE = [
-      ...BRAND,
-      ...orderedWheel.filter(hex => !BRAND.includes(hex))
-    ];
+    const PALETTE = [...BRAND, ...orderedWheel.filter(hex => !BRAND.includes(hex))];
 
     function makeWheel(n, s = 70, l = 50) {
       const arr = [];
@@ -309,6 +316,10 @@
     }
 
     async function fetchRows(){
+      // Capture the moment the user requested the data (local time)
+      const now = new Date();
+      asOf.textContent = `Current results as of: ${fmtAsOf(now)}`;
+
       setLoading(true);
       try {
         const q = new URLSearchParams({
@@ -364,6 +375,7 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
+      asOf.textContent = 'Current results as of: —';
     });
 
     (async function init(){
