@@ -47,13 +47,17 @@
     .title { font-size: 16px; font-weight: 700; margin:0 0 12px; }
     .filters {
       display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap:12px; margin: 10px 0 8px;
-      align-items: end;
+      gap:12px; margin: 10px 0 8px; align-items: end;
     }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
     select {
       width:100%; padding:10px 12px; color: var(--text); background:#fff;
       border:1px solid var(--border); border-radius:10px;
+    }
+    /* Scrollable program picker */
+    select#program {
+      max-height: 260px;       /* ensures a scrollbar appears when long */
+      overflow-y: auto;
     }
     .actions { display:flex; gap:10px; }
     .btn {
@@ -114,7 +118,8 @@
       <div class="filters">
         <div>
           <label for="program">Program</label>
-          <select id="program"></select>
+          <!-- size=10 makes it a scrollable listbox -->
+          <select id="program" size="10"></select>
         </div>
 
         <div>
@@ -162,7 +167,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.1'; // bump this when you release
+    const curr_version = '1.2'; // bump this when you release
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev'; // CORS-based API
 
     // Version line
@@ -273,4 +278,6 @@
     })();
   </script>
 </body>
+</html>
+
 </html>
