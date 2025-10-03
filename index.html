@@ -22,17 +22,13 @@
     .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
 
-    /* Filters layout (top-aligned, equal vertical structure) */
-    .filters {
-      display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap:12px; margin:10px 0 8px; align-items:start;
-    }
+    /* Filters */
+    .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:start; }
     .filter-field { display:flex; flex-direction:column; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
     select { width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; }
     .hint { font-size:11px; color:var(--muted); margin-top:4px; min-height:16px; }
     .hint.hidden { visibility:hidden; }
-
     .actions { display:flex; gap:10px; align-self:start; margin-top:22px; }
     .btn { appearance:none; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; transition: transform .02s, box-shadow .15s; }
     .btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.2); }
@@ -52,19 +48,19 @@
     .muted { color:var(--muted); }
     .right { text-align:right; }
 
-    /* ---- Donut chart styles ---- */
+    /* Donut (SVG) */
     .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
-    .donut-box { position:relative; width:200px; height:200px; }
-    .donut { width:100%; height:100%; border-radius:50%; background:#eef2ff; }
+    .donut-box { position:relative; width:220px; height:220px; }
+    .donut-svg { position:absolute; inset:0; }
     .donut-hole {
-      position:absolute; inset:22%; background:var(--card); border-radius:50%;
+      position:absolute; inset:24%; background:var(--card); border-radius:50%;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       box-shadow: inset 0 0 0 1px var(--border);
       text-align:center;
     }
-    .donut-hole .big { font-size:20px; font-weight:800; }
+    .donut-hole .big { font-size:22px; font-weight:800; }
     .donut-hole .small { font-size:11px; color:var(--muted); margin-top:2px; }
 
     .legend { list-style:none; margin:0; padding:0; columns:1; column-gap:18px; }
@@ -76,10 +72,7 @@
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">NWRTW • Dashboard</div>
-  </header>
-
+  <header><div class="brand">NWRTW • Dashboard</div></header>
   <div id="version-line"></div>
 
   <nav class="tabs">
@@ -89,7 +82,6 @@
   </nav>
 
   <main>
-    <!-- Tab 1: Patients By Program/Status -->
     <section class="card" id="tab-program-status">
       <h2 class="title">Patients By Program/Status</h2>
 
@@ -99,7 +91,6 @@
           <select id="program"></select>
           <div class="hint hidden" id="programHint">Scroll to see more programs</div>
         </div>
-
         <div class="filter-field">
           <label for="recordType">Record Type</label>
           <select id="recordType">
@@ -109,7 +100,6 @@
           </select>
           <div class="hint hidden">&nbsp;</div>
         </div>
-
         <div class="actions">
           <button class="btn btn-primary" id="runBtn">Load Results</button>
           <button class="btn btn-ghost" id="clearBtn" title="Reset filters">Reset</button>
@@ -119,18 +109,9 @@
       <div id="progress" class="bar"></div>
 
       <table>
-        <thead>
-          <tr><th>Program</th><th>Status</th><th>Count</th></tr>
-        </thead>
-        <tbody id="tbody">
-          <tr><td colspan="3" class="muted">No results</td></tr>
-        </tbody>
-        <tfoot id="tfoot" style="display:none;">
-          <tr>
-            <td class="right" colspan="2">Total</td>
-            <td id="totalCell">0</td>
-          </tr>
-        </tfoot>
+        <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
+        <tfoot id="tfoot" style="display:none;"><tr><td class="right" colspan="2">Total</td><td id="totalCell">0</td></tr></tfoot>
       </table>
 
       <!-- Donut chart -->
@@ -138,7 +119,7 @@
         <div class="chart-title">Status breakdown</div>
         <div class="chart-flex">
           <div class="donut-box">
-            <div class="donut" id="donut"></div>
+            <svg id="donutSvg" class="donut-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"></svg>
             <div class="donut-hole">
               <div class="big" id="donutTotal">0</div>
               <div class="small">Total</div>
@@ -154,17 +135,15 @@
       </div>
     </section>
 
-    <!-- Future tabs -->
     <section class="card" id="tab-tbd-2" style="display:none"><h2 class="title">Coming soon</h2></section>
     <section class="card" id="tab-tbd-3" style="display:none"><h2 class="title">Coming soon</h2></section>
   </main>
 
   <script>
     // ===== Config =====
-    const curr_version = '1.10';
+    const curr_version = '1.11';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
-    // Version line
     document.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById('version-line');
       if (el) el.textContent = `Version: ${curr_version}`;
@@ -189,7 +168,7 @@
     const tfoot = document.getElementById('tfoot');
     const totalCell = document.getElementById('totalCell');
     const chartSection = document.getElementById('chartSection');
-    const donut = document.getElementById('donut');
+    const donutSvg = document.getElementById('donutSvg');
     const donutTotal = document.getElementById('donutTotal');
     const legend = document.getElementById('legend');
     const meta = document.getElementById('meta');
@@ -269,7 +248,7 @@
       return color;
     }
 
-    // -------- Donut helpers --------
+    // -------- Donut helpers (SVG with slice gaps + high-contrast ordering) --------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
@@ -279,30 +258,78 @@
       }
       const total = Array.from(map.values()).reduce((a,b)=>a+b,0);
       const segments = Array.from(map.entries())
-        .map(([status,count]) => ({
-          status,
-          count,
-          color: getColorForLabel(status)
-        }))
+        .map(([status,count]) => {
+          const color = getColorForLabel(status);
+          const hueIdx = WHEEL.indexOf(color);
+          return { status, count, color, hueIdx };
+        })
         .sort((a,b)=> b.count - a.count);
       return { total, segments };
     }
 
-    function renderDonut({ total, segments }){
+    // Greedy order: after the first (largest) slice, always place next the slice
+    // with the furthest hue distance from the last placed slice (max contrast).
+    function orderByHueSeparation(segments){
+      if (segments.length <= 2) return segments.slice();
+      const remaining = segments.slice(1); // keep the largest first
+      const ordered = [segments[0]];
+      while (remaining.length) {
+        const last = ordered[ordered.length - 1];
+        let bestIdx = 0, bestDist = -1;
+        for (let i = 0; i < remaining.length; i++) {
+          const d = hueDistance(last.hueIdx, remaining[i].hueIdx);
+          if (d > bestDist) { bestDist = d; bestIdx = i; }
+        }
+        ordered.push(remaining.splice(bestIdx,1)[0]);
+      }
+      return ordered;
+    }
+    function hueDistance(a,b){
+      const diff = Math.abs(a-b);
+      return Math.min(diff, COLOR_WHEEL_SIZE - diff);
+    }
+
+    function renderDonutSVG({ total, segments }){
       if (!total || !segments.length) {
         chartSection.style.display = 'none';
-        donut.style.background = "#eef2ff";
-        donutTotal.textContent = "0";
-        legend.innerHTML = "";
+        donutSvg.innerHTML = '';
+        donutTotal.textContent = '0';
+        legend.innerHTML = '';
         return;
       }
-      let acc = 0;
-      const parts = segments.map(seg => {
-        const start = acc;
-        acc += (seg.count / total) * 360;
-        return `${seg.color} ${start}deg ${acc}deg`;
-      });
-      donut.style.background = `conic-gradient(${parts.join(',')})`;
+
+      // Draw SVG arcs with small gaps so adjacent similar colors remain distinct
+      const BOX = 200;
+      const cx = 100, cy = 100, r = 86;     // radius
+      const stroke = 32;                    // ring thickness
+      const C = 2 * Math.PI * r;           // circumference
+      const GAP = 2;                        // gap size along the arc (px)
+
+      donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
+      donutSvg.innerHTML = ''; // clear
+
+      let offset = 0;
+      const drawOrder = orderByHueSeparation(segments);
+
+      for (const seg of drawOrder) {
+        const frac = seg.count / total;
+        let dash = Math.max(frac * C - GAP, 0);
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', stroke.toString());
+        circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+        circle.setAttribute('stroke-dashoffset', (-offset).toString());
+        donutSvg.appendChild(circle);
+        offset += dash + GAP;
+      }
+
+      // Center numbers + legend
       donutTotal.textContent = total.toString();
       legend.innerHTML = segments.map(seg => {
         const pct = Math.round((seg.count/total)*100);
@@ -310,6 +337,7 @@
                   <span>${seg.status}</span>
                   <span class="pct">${seg.count} (${pct}%)</span></li>`;
       }).join('');
+
       chartSection.style.display = 'block';
     }
 
@@ -329,7 +357,8 @@
           tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
           tfoot.style.display = 'none';
           totalCell.textContent = '0';
-          renderDonut({ total:0, segments:[] });
+          colorMap.clear(); occupied.clear();
+          renderDonutSVG({ total:0, segments:[] });
         } else {
           tbody.innerHTML = rows.map(x => `
             <tr class="row">
@@ -341,9 +370,9 @@
           totalCell.textContent = total;
           tfoot.style.display = '';
 
-          // reset color assignments for a clean mapping per run
+          // fresh color assignment each run to keep mapping stable for the set
           colorMap.clear(); occupied.clear();
-          renderDonut(buildDonut(rows));
+          renderDonutSVG(buildDonut(rows));
         }
 
         const totalShown = Number(totalCell.textContent || '0');
@@ -354,7 +383,7 @@
         tfoot.style.display = 'none';
         totalCell.textContent = '0';
         colorMap.clear(); occupied.clear();
-        renderDonut({ total:0, segments:[] });
+        renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
       } finally {
@@ -370,15 +399,14 @@
       tfoot.style.display = 'none';
       totalCell.textContent = '0';
       colorMap.clear(); occupied.clear();
-      renderDonut({ total:0, segments:[] });
-      meta.textContent = '';
-      source.textContent = '';
+      renderDonutSVG({ total:0, segments:[] });
+      meta.textContent = ''; source.textContent = '';
     });
 
     (async function init(){
       await fetchPrograms();
-      // wait for user to click "Load Results"
     })();
   </script>
 </body>
 </html>
+
