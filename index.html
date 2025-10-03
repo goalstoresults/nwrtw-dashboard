@@ -22,6 +22,7 @@
     .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
 
+    /* Filters */
     .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:start; }
     .filter-field { display:flex; flex-direction:column; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
@@ -36,11 +37,7 @@
     .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
 
     .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
-
-    /* As-of line */
-    .asof { font-size:12px; color:var(--muted); margin:8px 0 4px; }
-
-    table { width:100%; border-collapse:collapse; margin-top:6px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
     th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
     th { color:var(--muted); font-weight:600; background:#fafbff; }
     tr:nth-child(even) td { background:#fcfdff; }
@@ -52,10 +49,10 @@
     .right { text-align:right; }
 
     /* Donut (SVG) */
-    .chart-wrap { margin-top:14px; display:none; }
+    .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
-    .donut-box { position:relative; width:180px; height:180px; }
+    .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
     .donut-svg { position:absolute; inset:0; }
     .donut-hole {
       position:absolute; inset:26%; background:var(--card); border-radius:50%;
@@ -111,9 +108,6 @@
 
       <div id="progress" class="bar"></div>
 
-      <!-- As-of timestamp placeholder -->
-      <div id="asOf" class="asof">Current results as of: —</div>
-
       <table>
         <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
         <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
@@ -147,7 +141,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.13.1';
+    const curr_version = '1.12';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -182,20 +176,11 @@
     const progress = document.getElementById('progress');
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const asOf = document.getElementById('asOf');
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
       runBtn.disabled = !!on;
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
-    }
-
-    function fmtAsOf(dt) {
-      return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZoneName: 'short'
-      }).format(dt);
     }
 
     async function fetchPrograms(){
@@ -215,13 +200,23 @@
       }
     }
 
-    /* ---------- Color palette (unchanged) ---------- */
-    const BRAND = ["#2563eb", "#16a34a"];
+    /* ---------- Deterministic color list ----------
+       - Reserve the first two "brand" colors.
+       - Generate the rest (46) from an evenly spaced HSL wheel.
+       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
+       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
+    ------------------------------------------------ */
+    const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
     const WHEEL_SIZE = 48;
-    const wheel = makeWheel(WHEEL_SIZE, 72, 52);
-    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE);
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE); // coprime step
     const orderedWheel = order.map(i => wheel[i]);
-    const PALETTE = [...BRAND, ...orderedWheel.filter(hex => !BRAND.includes(hex))];
+
+    // Build the final palette: brand colors first, then the ordered wheel excluding near-brand hues
+    const PALETTE = [
+      ...BRAND,
+      ...orderedWheel.filter(hex => !BRAND.includes(hex))
+    ];
 
     function makeWheel(n, s = 70, l = 50) {
       const arr = [];
@@ -245,17 +240,20 @@
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
+    // ---------- Donut (SVG arcs with gaps) ----------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
         const s = (r.status ?? "(blank)").toString();
-        theCount = Number(r.count || 0);
-        map.set(s, (map.get(s) || 0) + theCount);
+        const c = Number(r.count || 0);
+        map.set(s, (map.get(s) || 0) + c);
       }
       const total = Array.from(map.values()).reduce((a,b)=>a+b,0);
       const entries = Array.from(map.entries())
         .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
+
+      // Sequential color assignment from the fixed palette
       entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
       return { total, segments: entries };
     }
@@ -268,22 +266,37 @@
         legend.innerHTML = '';
         return;
       }
-      const BOX = 200, cx = 100, cy = 100, r = 70, stroke = 26, C = 2*Math.PI*r, GAP = 2;
+
+      // Geometry fits inside viewBox (no clipping)
+      const BOX = 200;
+      const cx = 100, cy = 100;
+      const r = 70;            // radius (smaller)
+      const stroke = 26;       // ring thickness
+      const C = 2 * Math.PI * r;
+      const GAP = 2;           // separation gap along arc
+
       donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
       donutSvg.innerHTML = '';
+
       let offset = 0;
       for (const seg of segments) {
         const frac = seg.count / total;
         const dash = Math.max(frac * C - GAP, 0);
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
-        circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', seg.color);
-        circle.setAttribute('stroke-width', stroke.toString()); circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', stroke.toString());
+        circle.setAttribute('stroke-linecap', 'butt');
         circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-        circle.setAttribute('stroke-dasharray', `${dash} ${C}`); circle.setAttribute('stroke-dashoffset', (-offset).toString());
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+        circle.setAttribute('stroke-dashoffset', (-offset).toString());
         donutSvg.appendChild(circle);
         offset += dash + GAP;
       }
+
       donutTotal.textContent = total.toString();
       legend.innerHTML = segments.map(seg => {
         const pct = Math.round((seg.count/total)*100);
@@ -291,14 +304,11 @@
                   <span>${seg.status}</span>
                   <span class="pct">${seg.count} (${pct}%)</span></li>`;
       }).join('');
+
       chartSection.style.display = 'block';
     }
 
     async function fetchRows(){
-      // Set the as-of timestamp first; guard if the element is missing
-      const now = new Date();
-      if (asOf) asOf.textContent = `Current results as of: ${fmtAsOf(now)}`;
-
       setLoading(true);
       try {
         const q = new URLSearchParams({
@@ -325,6 +335,7 @@
           const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
           totalCell.textContent = total;
           tfoot.style.display = '';
+
           renderDonutSVG(buildDonut(rows));
         }
 
@@ -338,8 +349,6 @@
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
-        // also reset as-of on failure to avoid misleading stamp
-        if (asOf) asOf.textContent = 'Current results as of: —';
       } finally {
         setLoading(false);
       }
@@ -355,7 +364,6 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
-      if (asOf) asOf.textContent = 'Current results as of: —';
     });
 
     (async function init(){
