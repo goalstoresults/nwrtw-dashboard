@@ -21,16 +21,25 @@
     main { padding:18px 20px; }
     .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
-    .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:end; }
+
+    /* Filters layout (top-aligned, equal vertical structure) */
+    .filters {
+      display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap:12px; margin:10px 0 8px; align-items:start;
+    }
+    .filter-field { display:flex; flex-direction:column; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
     select { width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; }
-    .hint { font-size:11px; color:var(--muted); margin-top:4px; }
-    .actions { display:flex; gap:10px; }
+    .hint { font-size:11px; color:var(--muted); margin-top:4px; min-height:16px; }
+    .hint.hidden { visibility:hidden; }
+
+    .actions { display:flex; gap:10px; align-self:start; margin-top:22px; }
     .btn { appearance:none; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; transition: transform .02s, box-shadow .15s; }
     .btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.2); }
     .btn-primary:hover { filter:brightness(1.03); }
     .btn-primary:active { transform:translateY(1px); }
     .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
+
     .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; }
     th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
@@ -63,19 +72,20 @@
       <h2 class="title">Patients By Program/Status</h2>
 
       <div class="filters">
-        <div>
+        <div class="filter-field">
           <label for="program">Program</label>
           <select id="program"></select>
-          <div class="hint" id="programHint" style="display:none">Scroll to see more programs</div>
+          <div class="hint hidden" id="programHint">Scroll to see more programs</div>
         </div>
 
-        <div>
+        <div class="filter-field">
           <label for="recordType">Record Type</label>
           <select id="recordType">
             <option value="ALL">ALL</option>
             <option value="Active">Active</option>
             <option value="Non Active">Non Active</option>
           </select>
+          <div class="hint hidden">&nbsp;</div>
         </div>
 
         <div class="actions">
@@ -114,7 +124,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.5';
+    const curr_version = '1.6';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     // Version line
@@ -163,12 +173,12 @@
         programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
         programEl.value = 'ALL';
 
-        // Show scroll hint if there are a lot of options
-        programHint.style.display = items.length > 12 ? '' : 'none';
+        // Show scroll hint if there are many options (keeps space reserved even when hidden)
+        programHint.classList.toggle('hidden', items.length <= 12);
       } catch (e) {
         programEl.innerHTML = `<option value="ALL">ALL</option>`;
         programEl.value = 'ALL';
-        programHint.style.display = 'none';
+        programHint.classList.add('hidden');
         meta.innerHTML = `<span class="error">Failed to load programs (${e.message})</span>`;
       }
     }
