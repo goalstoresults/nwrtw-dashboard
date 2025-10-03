@@ -53,7 +53,7 @@
     .right { text-align:right; }
 
     /* ---- Donut chart styles ---- */
-    .chart-wrap { margin-top:14px; display:none; }
+    .chart-wrap { margin-top:14px; display:none; } /* JS will set to block when data exists */
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
     .donut-box { position:relative; width:200px; height:200px; }
@@ -161,7 +161,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.7';
+    const curr_version = '1.8';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     // Version line
@@ -170,7 +170,7 @@
       if (el) el.textContent = `Version: ${curr_version}`;
     });
 
-    // Tabs (ready for future screens)
+    // Tabs
     document.querySelectorAll('.tab').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
@@ -274,7 +274,7 @@
                   <span class="pct">${seg.count} (${pct}%)</span></li>`;
       }).join('');
 
-      chartSection.style.display = '';
+      chartSection.style.display = 'block'; // <-- explicit show (fix)
     }
 
     async function fetchRows(){
@@ -305,7 +305,6 @@
           totalCell.textContent = total;
           tfoot.style.display = '';
 
-          // render donut from current rows
           renderDonut(buildDonut(rows));
         }
 
