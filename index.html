@@ -23,7 +23,10 @@
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
     .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:end; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-    select { width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; }
+    input[type="text"], select {
+      width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px;
+    }
+    .hint { font-size:11px; color:var(--muted); margin-top:4px; }
     .actions { display:flex; gap:10px; }
     .btn { appearance:none; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; transition: transform .02s, box-shadow .15s; }
     .btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.2); }
@@ -63,9 +66,11 @@
 
       <div class="filters">
         <div>
-          <label for="program">Program</label>
-          <!-- back to native dropdown (scrolls automatically when long) -->
-          <select id="program"></select>
+          <label for="programInput">Program</label>
+          <!-- Searchable combobox using datalist (always shows all options) -->
+          <input id="programInput" type="text" list="programList" placeholder="ALL" autocomplete="off" />
+          <datalist id="programList"></datalist>
+          <div class="hint">Tip: start typing (e.g., “SC”, “SIMP”, “SLP”, “Work Rehab”). Leave blank for ALL.</div>
         </div>
 
         <div>
@@ -113,7 +118,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.3';
+    const curr_version = '1.4';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     // Version line
@@ -134,7 +139,8 @@
     });
 
     // Elements
-    const programEl = document.getElementById('program');
+    const programInput = document.getElementById('programInput');
+    const programList = document.getElementById('programList');
     const recordTypeEl = document.getElementById('recordType');
     const tbody = document.getElementById('tbody');
     const tfoot = document.getElementById('tfoot');
@@ -156,20 +162,32 @@
         const r = await fetch(`${API_BASE}/programs`, { method: 'GET' });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
-        const items = j.programs || ['ALL'];
-        programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
-        programEl.value = 'ALL';
+        const items = (j.programs || ['ALL']).filter(Boolean);
+
+        // Fill datalist with ALL + distinct programs
+        programList.innerHTML = items.map(v => `<option value="${v}"></option>`).join('');
+        programInput.value = '';              // blank means ALL
+        programInput.placeholder = 'ALL';     // show ALL hint
       } catch (e) {
-        programEl.innerHTML = `<option value="ALL">ALL</option>`;
+        programList.innerHTML = `<option value="ALL"></option>`;
+        programInput.value = '';
+        programInput.placeholder = 'ALL';
         meta.innerHTML = `<span class="error">Failed to load programs (${e.message})</span>`;
       }
+    }
+
+    function currentProgramValue(){
+      const raw = (programInput.value || '').trim();
+      // treat blank or 'ALL' (any case) as ALL
+      if (!raw || raw.toUpperCase() === 'ALL') return 'ALL';
+      return raw;
     }
 
     async function fetchRows(){
       setLoading(true);
       try {
         const q = new URLSearchParams({
-          program: programEl.value || 'ALL',
+          program: currentProgramValue(),
           recordType: recordTypeEl.value || 'ALL',
         });
         const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
@@ -209,7 +227,8 @@
 
     runBtn.addEventListener('click', fetchRows);
     clearBtn.addEventListener('click', () => {
-      programEl.value = 'ALL';
+      programInput.value = '';
+      programInput.placeholder = 'ALL';
       recordTypeEl.value = 'ALL';
       tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
       tfoot.style.display = 'none';
@@ -225,3 +244,4 @@
   </script>
 </body>
 </html>
+
