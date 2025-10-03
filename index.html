@@ -51,7 +51,6 @@
     /* Donut (SVG) */
     .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
-    .chart-sub { display:none; font-size:12px; color:var(--muted); margin-top:2px; } /* NEW: timestamp under title */
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
     .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
     .donut-svg { position:absolute; inset:0; }
@@ -117,10 +116,7 @@
 
       <!-- Donut chart -->
       <div id="chartSection" class="chart-wrap">
-        <div class="chart-title">
-          Status breakdown
-          <div id="asOf" class="chart-sub">Current results as of: —</div> <!-- NEW: second line under title -->
-        </div>
+        <div class="chart-title">Status breakdown</div>
         <div class="chart-flex">
           <div class="donut-box">
             <svg id="donutSvg" class="donut-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"></svg>
@@ -145,7 +141,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.12.2'; // patch: timestamp under chart title
+    const curr_version = '1.12';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -180,21 +176,11 @@
     const progress = document.getElementById('progress');
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const asOf = document.getElementById('asOf'); // NEW
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
       runBtn.disabled = !!on;
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
-    }
-
-    // Nice local timestamp
-    function fmtAsOf(dt) {
-      return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZoneName: 'short'
-      }).format(dt);
     }
 
     async function fetchPrograms(){
@@ -214,7 +200,12 @@
       }
     }
 
-    /* ---------- Deterministic color list ---------- */
+    /* ---------- Deterministic color list ----------
+       - Reserve the first two "brand" colors.
+       - Generate the rest (46) from an evenly spaced HSL wheel.
+       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
+       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
+    ------------------------------------------------ */
     const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
     const WHEEL_SIZE = 48;
     const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
@@ -348,12 +339,6 @@
           renderDonutSVG(buildDonut(rows));
         }
 
-        // NEW: set the timestamp under the chart title (show only on success)
-        if (asOf) {
-          asOf.textContent = `Current results as of: ${fmtAsOf(new Date())}`;
-          asOf.style.display = 'block';
-        }
-
         const totalShown = Number(totalCell.textContent || '0');
         meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
         source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
@@ -364,8 +349,6 @@
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
-        // Hide as-of on error to avoid stale stamp
-        if (asOf) { asOf.textContent = 'Current results as of: —'; asOf.style.display = 'none'; }
       } finally {
         setLoading(false);
       }
@@ -381,7 +364,6 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
-      if (asOf) { asOf.textContent = 'Current results as of: —'; asOf.style.display = 'none'; }
     });
 
     (async function init(){
@@ -390,5 +372,4 @@
   </script>
 </body>
 </html>
-
 
