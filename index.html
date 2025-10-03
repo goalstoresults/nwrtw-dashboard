@@ -6,31 +6,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { --bg:#0b0f14; --card:#131a22; --muted:#9aa6b2; --text:#e9eef6; --accent:#43b581; --border:#1f2937; }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
-    header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
-    .brand{font-weight:700;letter-spacing:.3px}
-    .tabs{display:flex;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border)}
-    .tab{padding:10px 14px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid var(--border);color:var(--muted)}
-    .tab.active{background:var(--card);color:var(--text);border-color:#2b3645}
-    main{padding:18px 20px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-    .title{font-size:16px;font-weight:700;margin:0 0 10px}
-    .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0 16px}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    select{width:100%;padding:10px 12px;color:var(--text);background:#0e141b;border:1px solid var(--border);border-radius:10px}
-    table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border)}
-    th{color:var(--muted);font-weight:600}
-    .row{transition:background .15s}
-    .row:hover{background:rgba(255,255,255,.03)}
-    .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;background:#0e141b;border:1px solid var(--border);color:var(--text)}
-    .bar{height:4px;background:linear-gradient(90deg,var(--accent),#00c2ff);border-radius:999px;width:0;transition:width .4s}
-    .footer{margin-top:10px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:10px}
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif; }
+    header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+    .brand { font-weight: 700; letter-spacing: .3px; }
+    #version-line { padding: 6px 20px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); }
+    .tabs { display:flex; gap:10px; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+    .tab { padding:10px 14px; border-radius:10px; cursor:pointer; background:transparent; border:1px solid var(--border); color:var(--muted); }
+    .tab.active { background: var(--card); color: var(--text); border-color: #2b3645; }
+    main { padding: 18px 20px; }
+    .card { background: var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; }
+    .title { font-size: 16px; font-weight: 700; margin:0 0 10px; }
+    .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin: 10px 0 16px; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    select { width:100%; padding:10px 12px; color:var(--text); background:#0e141b; border:1px solid var(--border); border-radius:10px; }
+    table { width:100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
+    th { color: var(--muted); font-weight:600; }
+    .row { transition: background .15s; }
+    .row:hover { background: rgba(255,255,255,0.03); }
+    .pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; background:#0e141b; border:1px solid var(--border); color:var(--text); }
+    .bar { height: 4px; background: linear-gradient(90deg, var(--accent), #00c2ff); border-radius: 999px; width: 0; transition: width .4s; }
+    .footer { margin-top: 10px; font-size:12px; color: var(--muted); display:flex; justify-content: space-between; align-items:center; gap: 10px; }
+    .error { color:#ffb4b4; }
   </style>
 </head>
 <body>
-  <header><div class="brand">NWRTW • Dashboard</div></header>
+  <header>
+    <div class="brand">NWRTW • Dashboard</div>
+  </header>
+
+  <div id="version-line"></div>
 
   <nav class="tabs">
     <button class="tab active" data-tab="program-status">Patients By Program/Status</button>
@@ -71,13 +77,21 @@
       </div>
     </section>
 
-    <!-- Future tabs go here -->
+    <!-- Future tabs -->
     <section class="card" id="tab-tbd-2" style="display:none"><h2 class="title">Coming soon</h2></section>
     <section class="card" id="tab-tbd-3" style="display:none"><h2 class="title">Coming soon</h2></section>
   </main>
 
-  <script>  
+  <script>
+    // ===== Config =====
+    const curr_version = '1.0'; // bump this when you release
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
+
+    // Version line
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('version-line');
+      if (el) el.textContent = `Version: ${curr_version}`;
+    });
 
     // Tabs (ready for future screens)
     document.querySelectorAll('.tab').forEach(btn => {
@@ -90,41 +104,57 @@
       });
     });
 
+    // Elements
     const programEl = document.getElementById('program');
     const recordTypeEl = document.getElementById('recordType');
     const tbody = document.getElementById('tbody');
     const meta = document.getElementById('meta');
     const source = document.getElementById('source');
     const progress = document.getElementById('progress');
+
     function setLoading(on){ progress.style.width = on ? '90%' : '0%' }
 
     async function fetchPrograms(){
-      const r = await fetch(`${API_BASE}/programs`);
-      const j = await r.json();
-      const items = j.programs || ['ALL'];
-      programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
-      programEl.value = 'ALL';
+      try {
+        const r = await fetch(`${API_BASE}/programs`, { method: 'GET' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const items = j.programs || ['ALL'];
+        programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
+        programEl.value = 'ALL';
+      } catch (e) {
+        programEl.innerHTML = `<option value="ALL">ALL</option>`;
+        meta.innerHTML = `<span class="error">Failed to load programs (${e.message})</span>`;
+      }
     }
 
     async function fetchRows(){
       setLoading(true);
-      const q = new URLSearchParams({
-        program: programEl.value || 'ALL',
-        recordType: recordTypeEl.value || 'ALL',
-      });
-      const r = await fetch(`${API_BASE}/totals?` + q.toString());
-      const j = await r.json();
-      const rows = j.rows || [];
-      tbody.innerHTML = rows.map(x => `
-        <tr class="row">
-          <td>${x.program}</td>
-          <td>${x.status}</td>
-          <td>${x.count}</td>
-        </tr>`).join('');
-      const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
-      meta.textContent = rows.length ? `${total} total across ${rows.length} groups` : 'No results';
-      source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
-      setLoading(false);
+      try {
+        const q = new URLSearchParams({
+          program: programEl.value || 'ALL',
+          recordType: recordTypeEl.value || 'ALL',
+        });
+        const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const rows = j.rows || [];
+        tbody.innerHTML = rows.map(x => `
+          <tr class="row">
+            <td>${x.program}</td>
+            <td>${x.status}</td>
+            <td>${x.count}</td>
+          </tr>`).join('');
+        const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
+        meta.textContent = rows.length ? `${total} total across ${rows.length} groups` : 'No results';
+        source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
+      } catch (e) {
+        tbody.innerHTML = '';
+        meta.innerHTML = `<span class="error">Failed to load totals (${e.message})</span>`;
+        source.textContent = '';
+      } finally {
+        setLoading(false);
+      }
     }
 
     programEl.addEventListener('change', fetchRows);
