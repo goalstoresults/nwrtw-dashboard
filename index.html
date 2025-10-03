@@ -6,95 +6,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --bg:#f7fafc;          /* page background */
-      --card:#ffffff;        /* cards */
-      --text:#1f2937;        /* primary text */
-      --muted:#6b7280;       /* secondary text */
-      --border:#e5e7eb;      /* borders */
-      --accent:#2563eb;      /* primary accent (blue) */
-      --accent-2:#059669;    /* secondary accent (green) */
+      --bg:#f7fafc; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+      --accent:#2563eb; --accent-2:#059669;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0; background: var(--bg); color: var(--text);
-      font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
-    }
-    header {
-      padding: 18px 20px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 12px;
-    }
-    .brand { font-weight: 700; letter-spacing: .2px; }
-    #version-line {
-      padding: 8px 20px; color: var(--muted); font-size: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-    .tabs {
-      display:flex; gap:10px; padding: 12px 20px; border-bottom: 1px solid var(--border);
-      background:#fbfdff;
-    }
-    .tab {
-      padding:10px 14px; border-radius:10px; cursor:pointer;
-      background:#fff; border:1px solid var(--border); color:var(--muted);
-      box-shadow: 0 1px 1px rgba(0,0,0,.03);
-    }
-    .tab.active { color: var(--text); border-color:#cfd8e3; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+    .brand { font-weight:700; letter-spacing:.2px; }
+    #version-line { padding:8px 20px; color:var(--muted); font-size:12px; border-bottom:1px solid var(--border); }
+    .tabs { display:flex; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); background:#fbfdff; }
+    .tab { padding:10px 14px; border-radius:10px; cursor:pointer; background:#fff; border:1px solid var(--border); color:var(--muted); box-shadow:0 1px 1px rgba(0,0,0,.03); }
+    .tab.active { color:var(--text); border-color:#cfd8e3; }
     .tab:disabled { opacity:.6; cursor:not-allowed; }
-    main { padding: 18px 20px; }
-    .card {
-      background: var(--card); border:1px solid var(--border); border-radius:14px; padding:16px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.04);
-    }
-    .title { font-size: 16px; font-weight: 700; margin:0 0 12px; }
-    .filters {
-      display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap:12px; margin: 10px 0 8px; align-items: end;
-    }
+    main { padding:18px 20px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    .title { font-size:16px; font-weight:700; margin:0 0 12px; }
+    .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:end; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-    select {
-      width:100%; padding:10px 12px; color: var(--text); background:#fff;
-      border:1px solid var(--border); border-radius:10px;
-    }
-    /* Scrollable program picker */
-    select#program {
-      max-height: 260px;       /* ensures a scrollbar appears when long */
-      overflow-y: auto;
-    }
+    select { width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; }
     .actions { display:flex; gap:10px; }
-    .btn {
-      appearance:none; border:1px solid transparent; border-radius:10px;
-      padding:10px 14px; font-weight:600; cursor:pointer;
-      transition: transform .02s ease-in-out, box-shadow .15s;
-    }
-    .btn-primary {
-      background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,.2);
-    }
-    .btn-primary:hover { filter: brightness(1.03); }
-    .btn-primary:active { transform: translateY(1px); }
-    .btn-ghost { background:#fff; color: var(--text); border:1px solid var(--border); }
-    .bar {
-      height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      border-radius: 999px; width: 0; transition: width .35s; margin: 6px 0 2px;
-    }
-    table { width:100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
-    th { color: var(--muted); font-weight:600; background:#fafbff; }
-    tr:nth-child(even) td { background: #fcfdff; }
-    tfoot td {
-      background:#f3f6ff; /* subtle blue-ish */
-      font-weight:700;
-      border-top: 2px solid #c7d2fe;
-    }
-    .footer {
-      margin-top: 10px; font-size:12px; color: var(--muted);
-      display:flex; justify-content: space-between; align-items:center; gap: 10px;
-    }
-    .pill {
-      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px;
-      background:#eef2ff; color:#3730a3; border:1px solid #e0e7ff;
-    }
+    .btn { appearance:none; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; transition: transform .02s, box-shadow .15s; }
+    .btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.2); }
+    .btn-primary:hover { filter:brightness(1.03); }
+    .btn-primary:active { transform:translateY(1px); }
+    .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
+    th { color:var(--muted); font-weight:600; background:#fafbff; }
+    tr:nth-child(even) td { background:#fcfdff; }
+    tfoot td { background:#f3f6ff; font-weight:700; border-top:2px solid #c7d2fe; }
+    .footer { margin-top:10px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; background:#eef2ff; color:#3730a3; border:1px solid #e0e7ff; }
     .error { color:#b91c1c; font-weight:600; }
-    .muted { color: var(--muted); }
-    .right { text-align: right; }
+    .muted { color:var(--muted); }
+    .right { text-align:right; }
   </style>
 </head>
 <body>
@@ -118,8 +64,8 @@
       <div class="filters">
         <div>
           <label for="program">Program</label>
-          <!-- size=10 makes it a scrollable listbox -->
-          <select id="program" size="10"></select>
+          <!-- back to native dropdown (scrolls automatically when long) -->
+          <select id="program"></select>
         </div>
 
         <div>
@@ -167,8 +113,8 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.2'; // bump this when you release
-    const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev'; // CORS-based API
+    const curr_version = '1.3';
+    const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     // Version line
     document.addEventListener('DOMContentLoaded', () => {
@@ -274,10 +220,8 @@
 
     (async function init(){
       await fetchPrograms();
-      // Wait for user to click "Load Results"
+      // user clicks "Load Results"
     })();
   </script>
 </body>
-</html>
-
 </html>
