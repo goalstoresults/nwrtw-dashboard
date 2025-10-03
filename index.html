@@ -161,7 +161,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.8';
+    const curr_version = '1.9';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     // Version line
@@ -223,8 +223,12 @@
 
     // -------- Donut helpers --------
     const PALETTE = [
-      "#2563eb","#059669","#f59e0b","#ef4444","#8b5cf6","#10b981",
-      "#f97316","#06b6d4","#84cc16","#ec4899","#14b8a6","#a855f7"
+      "#2563eb","#16a34a","#f59e0b","#ef4444","#8b5cf6","#10b981",
+      "#f97316","#06b6d4","#84cc16","#ec4899","#14b8a6","#a855f7",
+      "#3b82f6","#22c55e","#eab308","#dc2626","#7c3aed","#34d399",
+      "#fb923c","#0ea5e9","#65a30d","#d946ef","#059669","#f43f5e",
+      "#60a5fa","#4ade80","#facc15","#f472b6","#2dd4bf","#0d9488",
+      "#b45309","#9333ea"
     ];
     const hashToIndex = (s, m) => {
       let h = 0; for (let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0; return h % m;
