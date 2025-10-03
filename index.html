@@ -52,15 +52,15 @@
     .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
-    .donut-box { position:relative; width:220px; height:220px; }
+    .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
     .donut-svg { position:absolute; inset:0; }
     .donut-hole {
-      position:absolute; inset:24%; background:var(--card); border-radius:50%;
+      position:absolute; inset:26%; background:var(--card); border-radius:50%;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       box-shadow: inset 0 0 0 1px var(--border);
       text-align:center;
     }
-    .donut-hole .big { font-size:22px; font-weight:800; }
+    .donut-hole .big { font-size:20px; font-weight:800; }
     .donut-hole .small { font-size:11px; color:var(--muted); margin-top:2px; }
 
     .legend { list-style:none; margin:0; padding:0; columns:1; column-gap:18px; }
@@ -141,7 +141,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.11';
+    const curr_version = '1.12';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -200,11 +200,25 @@
       }
     }
 
-    // -------- Color system: 48 evenly spaced hues + stable per-status mapping --------
-    const COLOR_WHEEL_SIZE = 48;
-    const WHEEL = makeColorWheel(COLOR_WHEEL_SIZE, 70, 50); // sat=70%, light=50%
+    /* ---------- Deterministic color list ----------
+       - Reserve the first two "brand" colors.
+       - Generate the rest (46) from an evenly spaced HSL wheel.
+       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
+       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
+    ------------------------------------------------ */
+    const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
+    const WHEEL_SIZE = 48;
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE); // coprime step
+    const orderedWheel = order.map(i => wheel[i]);
 
-    function makeColorWheel(n, s = 70, l = 50) {
+    // Build the final palette: brand colors first, then the ordered wheel excluding near-brand hues
+    const PALETTE = [
+      ...BRAND,
+      ...orderedWheel.filter(hex => !BRAND.includes(hex))
+    ];
+
+    function makeWheel(n, s = 70, l = 50) {
       const arr = [];
       for (let i = 0; i < n; i++) {
         const h = Math.round((i * 360) / n);
@@ -213,42 +227,20 @@
       return arr;
     }
     function hslToHex(h, s, l) {
-      s /= 100; l /= 100;
-      const c = (1 - Math.abs(2 * l - 1)) * s;
-      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-      const m = l - c / 2;
-      let [r, g, b] = [0, 0, 0];
-      if (0 <= h && h < 60) [r,g,b] = [c,x,0];
-      else if (60 <= h && h < 120) [r,g,b] = [x,c,0];
-      else if (120 <= h && h < 180) [r,g,b] = [0,c,x];
-      else if (180 <= h && h < 240) [r,g,b] = [0,x,c];
-      else if (240 <= h && h < 300) [r,g,b] = [x,0,c];
-      else [r,g,b] = [c,0,x];
-      const toHex = v => Math.round((v + m) * 255).toString(16).padStart(2,'0');
+      s/=100; l/=100;
+      const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=l-c/2;
+      let r=0,g=0,b=0;
+      if (h<60){r=c; g=x;}
+      else if (h<120){r=x; g=c;}
+      else if (h<180){g=c; b=x;}
+      else if (h<240){g=x; b=c;}
+      else if (h<300){r=x; b=c;}
+      else {r=c; b=x;}
+      const toHex=v=>Math.round((v+m)*255).toString(16).padStart(2,'0');
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
-    const colorMap = new Map();
-    const occupied = new Set();
-    function hashToIndex(s, m) {
-      let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-      return h % m;
-    }
-    function getColorForLabel(label) {
-      const key = String(label);
-      if (colorMap.has(key)) return colorMap.get(key);
-      let idx = hashToIndex(key, COLOR_WHEEL_SIZE);
-      const start = idx;
-      while (occupied.has(idx)) {
-        idx = (idx + 7) % COLOR_WHEEL_SIZE; // coprime step to spread collisions
-        if (idx === start) break;
-      }
-      occupied.add(idx);
-      const color = WHEEL[idx];
-      colorMap.set(key, color);
-      return color;
-    }
 
-    // -------- Donut helpers (SVG with slice gaps + high-contrast ordering) --------
+    // ---------- Donut (SVG arcs with gaps) ----------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
@@ -257,36 +249,13 @@
         map.set(s, (map.get(s) || 0) + c);
       }
       const total = Array.from(map.values()).reduce((a,b)=>a+b,0);
-      const segments = Array.from(map.entries())
-        .map(([status,count]) => {
-          const color = getColorForLabel(status);
-          const hueIdx = WHEEL.indexOf(color);
-          return { status, count, color, hueIdx };
-        })
+      const entries = Array.from(map.entries())
+        .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
-      return { total, segments };
-    }
 
-    // Greedy order: after the first (largest) slice, always place next the slice
-    // with the furthest hue distance from the last placed slice (max contrast).
-    function orderByHueSeparation(segments){
-      if (segments.length <= 2) return segments.slice();
-      const remaining = segments.slice(1); // keep the largest first
-      const ordered = [segments[0]];
-      while (remaining.length) {
-        const last = ordered[ordered.length - 1];
-        let bestIdx = 0, bestDist = -1;
-        for (let i = 0; i < remaining.length; i++) {
-          const d = hueDistance(last.hueIdx, remaining[i].hueIdx);
-          if (d > bestDist) { bestDist = d; bestIdx = i; }
-        }
-        ordered.push(remaining.splice(bestIdx,1)[0]);
-      }
-      return ordered;
-    }
-    function hueDistance(a,b){
-      const diff = Math.abs(a-b);
-      return Math.min(diff, COLOR_WHEEL_SIZE - diff);
+      // Sequential color assignment from the fixed palette
+      entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
+      return { total, segments: entries };
     }
 
     function renderDonutSVG({ total, segments }){
@@ -298,22 +267,21 @@
         return;
       }
 
-      // Draw SVG arcs with small gaps so adjacent similar colors remain distinct
+      // Geometry fits inside viewBox (no clipping)
       const BOX = 200;
-      const cx = 100, cy = 100, r = 86;     // radius
-      const stroke = 32;                    // ring thickness
-      const C = 2 * Math.PI * r;           // circumference
-      const GAP = 2;                        // gap size along the arc (px)
+      const cx = 100, cy = 100;
+      const r = 70;            // radius (smaller)
+      const stroke = 26;       // ring thickness
+      const C = 2 * Math.PI * r;
+      const GAP = 2;           // separation gap along arc
 
       donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
-      donutSvg.innerHTML = ''; // clear
+      donutSvg.innerHTML = '';
 
       let offset = 0;
-      const drawOrder = orderByHueSeparation(segments);
-
-      for (const seg of drawOrder) {
+      for (const seg of segments) {
         const frac = seg.count / total;
-        let dash = Math.max(frac * C - GAP, 0);
+        const dash = Math.max(frac * C - GAP, 0);
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', cx);
         circle.setAttribute('cy', cy);
@@ -329,7 +297,6 @@
         offset += dash + GAP;
       }
 
-      // Center numbers + legend
       donutTotal.textContent = total.toString();
       legend.innerHTML = segments.map(seg => {
         const pct = Math.round((seg.count/total)*100);
@@ -357,7 +324,6 @@
           tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
           tfoot.style.display = 'none';
           totalCell.textContent = '0';
-          colorMap.clear(); occupied.clear();
           renderDonutSVG({ total:0, segments:[] });
         } else {
           tbody.innerHTML = rows.map(x => `
@@ -370,8 +336,6 @@
           totalCell.textContent = total;
           tfoot.style.display = '';
 
-          // fresh color assignment each run to keep mapping stable for the set
-          colorMap.clear(); occupied.clear();
           renderDonutSVG(buildDonut(rows));
         }
 
@@ -382,7 +346,6 @@
         tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
         tfoot.style.display = 'none';
         totalCell.textContent = '0';
-        colorMap.clear(); occupied.clear();
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
@@ -398,9 +361,9 @@
       tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
       tfoot.style.display = 'none';
       totalCell.textContent = '0';
-      colorMap.clear(); occupied.clear();
       renderDonutSVG({ total:0, segments:[] });
-      meta.textContent = ''; source.textContent = '';
+      meta.textContent = '';
+      source.textContent = '';
     });
 
     (async function init(){
@@ -409,4 +372,3 @@
   </script>
 </body>
 </html>
-
