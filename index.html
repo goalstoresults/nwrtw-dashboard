@@ -7,7 +7,7 @@
   <style>
     :root {
       --bg:#f7fafc; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
-      --accent:#2563eb; --accent-2:#16a34a;
+      --accent:#2563eb; --accent-2:#059669;
     }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
@@ -36,12 +36,8 @@
     .btn-primary:active { transform:translateY(1px); }
     .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
 
-    .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 10px; }
-
-    /* As-of line */
-    .asof { font-size:12px; color:var(--muted); margin:6px 0 4px; }
-
-    table { width:100%; border-collapse:collapse; margin-top:6px; }
+    .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
     th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
     th { color:var(--muted); font-weight:600; background:#fafbff; }
     tr:nth-child(even) td { background:#fcfdff; }
@@ -112,8 +108,6 @@
 
       <div id="progress" class="bar"></div>
 
-      <div id="asOf" class="asof">Current results as of: —</div>
-
       <table>
         <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
         <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
@@ -147,10 +141,9 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.13';
+    const curr_version = '1.12';
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
-    // Version line
     document.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById('version-line');
       if (el) el.textContent = `Version: ${curr_version}`;
@@ -183,22 +176,11 @@
     const progress = document.getElementById('progress');
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const asOf = document.getElementById('asOf');
-
-    let lastLoadedAt = null;
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
       runBtn.disabled = !!on;
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
-    }
-
-    function fmtAsOf(dt) {
-      return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZoneName: 'short'
-      }).format(dt);
     }
 
     async function fetchPrograms(){
@@ -218,13 +200,23 @@
       }
     }
 
-    /* ---------- Deterministic color list ---------- */
-    const BRAND = ["#2563eb", "#16a34a"];
+    /* ---------- Deterministic color list ----------
+       - Reserve the first two "brand" colors.
+       - Generate the rest (46) from an evenly spaced HSL wheel.
+       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
+       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
+    ------------------------------------------------ */
+    const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
     const WHEEL_SIZE = 48;
-    const wheel = makeWheel(WHEEL_SIZE, 72, 52);
-    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE);
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE); // coprime step
     const orderedWheel = order.map(i => wheel[i]);
-    const PALETTE = [...BRAND, ...orderedWheel.filter(hex => !BRAND.includes(hex))];
+
+    // Build the final palette: brand colors first, then the ordered wheel excluding near-brand hues
+    const PALETTE = [
+      ...BRAND,
+      ...orderedWheel.filter(hex => !BRAND.includes(hex))
+    ];
 
     function makeWheel(n, s = 70, l = 50) {
       const arr = [];
@@ -260,6 +252,8 @@
       const entries = Array.from(map.entries())
         .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
+
+      // Sequential color assignment from the fixed palette
       entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
       return { total, segments: entries };
     }
@@ -273,12 +267,13 @@
         return;
       }
 
+      // Geometry fits inside viewBox (no clipping)
       const BOX = 200;
       const cx = 100, cy = 100;
-      const r = 70;
-      const stroke = 26;
+      const r = 70;            // radius (smaller)
+      const stroke = 26;       // ring thickness
       const C = 2 * Math.PI * r;
-      const GAP = 2;
+      const GAP = 2;           // separation gap along arc
 
       donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
       donutSvg.innerHTML = '';
@@ -314,10 +309,6 @@
     }
 
     async function fetchRows(){
-      // Capture as-of timestamp right when the click happens
-      lastLoadedAt = new Date();
-      asOf.textContent = `Current results as of: ${fmtAsOf(lastLoadedAt)}`;
-
       setLoading(true);
       try {
         const q = new URLSearchParams({
@@ -344,15 +335,13 @@
           const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
           totalCell.textContent = total;
           tfoot.style.display = '';
+
           renderDonutSVG(buildDonut(rows));
         }
 
         const totalShown = Number(totalCell.textContent || '0');
         meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
-
-        // Show/hide the chip based on the worker flag
-        source.textContent = (j.source === 'db-aggregated') ? 'DB aggregated' : 'Worker grouped';
-        source.style.display = j.show_source ? 'inline-block' : 'none';
+        source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
         tfoot.style.display = 'none';
@@ -360,7 +349,6 @@
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
-        source.style.display = 'none';
       } finally {
         setLoading(false);
       }
@@ -370,15 +358,12 @@
     clearBtn.addEventListener('click', () => {
       programEl.value = 'ALL';
       recordTypeEl.value = 'ALL';
-      lastLoadedAt = null;
-      asOf.textContent = 'Current results as of: —';
       tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
       tfoot.style.display = 'none';
       totalCell.textContent = '0';
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
-      source.style.display = 'none';
     });
 
     (async function init(){
@@ -387,4 +372,3 @@
   </script>
 </body>
 </html>
-
