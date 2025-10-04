@@ -116,7 +116,9 @@
 
       <!-- Donut chart -->
       <div id="chartSection" class="chart-wrap">
-        <div class="chart-title">Status breakdown as of </div>
+        <div class="chart-title">
+          Status breakdown <span id="asOfTitle" class="muted"></span>
+        </div>
         <div class="chart-flex">
           <div class="donut-box">
             <svg id="donutSvg" class="donut-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"></svg>
@@ -141,7 +143,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.12.1';
+    const curr_version = '1.12.2'; // add "as of" in chart title
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -161,26 +163,36 @@
     });
 
     // Elements
-    const programEl = document.getElementById('program');
+    const programEl   = document.getElementById('program');
     const programHint = document.getElementById('programHint');
-    const recordTypeEl = document.getElementById('recordType');
-    const tbody = document.getElementById('tbody');
-    const tfoot = document.getElementById('tfoot');
-    const totalCell = document.getElementById('totalCell');
-    const chartSection = document.getElementById('chartSection');
-    const donutSvg = document.getElementById('donutSvg');
-    const donutTotal = document.getElementById('donutTotal');
-    const legend = document.getElementById('legend');
-    const meta = document.getElementById('meta');
-    const source = document.getElementById('source');
-    const progress = document.getElementById('progress');
-    const runBtn = document.getElementById('runBtn');
-    const clearBtn = document.getElementById('clearBtn');
+    const recordTypeEl= document.getElementById('recordType');
+    const tbody       = document.getElementById('tbody');
+    const tfoot       = document.getElementById('tfoot');
+    const totalCell   = document.getElementById('totalCell');
+    const chartSection= document.getElementById('chartSection');
+    const donutSvg    = document.getElementById('donutSvg');
+    const donutTotal  = document.getElementById('donutTotal');
+    const legend      = document.getElementById('legend');
+    const meta        = document.getElementById('meta');
+    const source      = document.getElementById('source');
+    const progress    = document.getElementById('progress');
+    const runBtn      = document.getElementById('runBtn');
+    const clearBtn    = document.getElementById('clearBtn');
+    const asOfTitle   = document.getElementById('asOfTitle'); // NEW
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
       runBtn.disabled = !!on;
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
+    }
+
+    // Nice local timestamp (NY time by request)
+    function fmtAsOf(dt) {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(dt);
     }
 
     async function fetchPrograms(){
@@ -200,23 +212,13 @@
       }
     }
 
-    /* ---------- Deterministic color list ----------
-       - Reserve the first two "brand" colors.
-       - Generate the rest (46) from an evenly spaced HSL wheel.
-       - Reorder the wheel with a coprime step so adjacent entries differ a lot.
-       - Assign colors SEQUENTIALLY to sorted statuses (no hashing).
-    ------------------------------------------------ */
-    const BRAND = ["#2563eb", "#16a34a"];           // 1) your two reserved colors (blue, green)
+    /* ---------- Deterministic color list ---------- */
+    const BRAND = ["#2563eb", "#16a34a"];
     const WHEEL_SIZE = 48;
-    const wheel = makeWheel(WHEEL_SIZE, 72, 52);    // evenly spaced hues
-    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE); // coprime step
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE);
     const orderedWheel = order.map(i => wheel[i]);
-
-    // Build the final palette: brand colors first, then the ordered wheel excluding near-brand hues
-    const PALETTE = [
-      ...BRAND,
-      ...orderedWheel.filter(hex => !BRAND.includes(hex))
-    ];
+    const PALETTE = [...BRAND, ...orderedWheel.filter(hex => !BRAND.includes(hex))];
 
     function makeWheel(n, s = 70, l = 50) {
       const arr = [];
@@ -339,6 +341,11 @@
           renderDonutSVG(buildDonut(rows));
         }
 
+        // NEW: put the as-of right in the chart title (after success)
+        if (asOfTitle) {
+          asOfTitle.textContent = 'as of ' + fmtAsOf(new Date());
+        }
+
         const totalShown = Number(totalCell.textContent || '0');
         meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
         source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
@@ -349,6 +356,7 @@
         renderDonutSVG({ total:0, segments:[] });
         meta.textContent = '';
         source.textContent = '';
+        if (asOfTitle) asOfTitle.textContent = ''; // clear on error
       } finally {
         setLoading(false);
       }
@@ -364,6 +372,7 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
+      if (asOfTitle) asOfTitle.textContent = ''; // clear on reset
     });
 
     (async function init(){
@@ -372,4 +381,5 @@
   </script>
 </body>
 </html>
+
 
