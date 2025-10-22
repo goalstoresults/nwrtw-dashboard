@@ -49,26 +49,35 @@
     .right { text-align:right; }
 
     /* Donut (SVG) */
-    .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
+    .chart-wrap { margin-top:14px; display:none; }
     .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
     .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
-    .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
+    .donut-box { position:relative; width:180px; height:180px; }
     .donut-svg { position:absolute; inset:0; }
-    .donut-hole {
-      position:absolute; inset:26%; background:var(--card); border-radius:50%;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      box-shadow: inset 0 0 0 1px var(--border);
-      text-align:center;
-    }
+    .donut-hole { position:absolute; inset:26%; background:var(--card); border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow: inset 0 0 0 1px var(--border); text-align:center; }
     .donut-hole .big { font-size:20px; font-weight:800; }
     .donut-hole .small { font-size:11px; color:var(--muted); margin-top:2px; }
-
     .legend { list-style:none; margin:0; padding:0; columns:1; column-gap:18px; }
     @media (min-width: 720px) { .legend { columns:2; } }
     @media (min-width: 980px) { .legend { columns:3; } }
     .legend li { break-inside:avoid; display:flex; align-items:center; gap:8px; margin:6px 0; }
     .swatch { width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,.08); }
     .legend .pct { color:var(--muted); margin-left:auto; padding-left:12px; }
+
+    /* Multi-chart grid (Tab 2) */
+    .grid-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:6px; }
+    .asof { font-size:12px; color:var(--muted); }
+    .grid-charts { display:grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap:16px; }
+    @media (max-width: 1280px) { .grid-charts { grid-template-columns: repeat(3, minmax(220px, 1fr)); } }
+    @media (max-width: 980px)  { .grid-charts { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+    @media (max-width: 640px)  { .grid-charts { grid-template-columns: repeat(1, minmax(220px, 1fr)); } }
+    .mini-card { border:1px solid var(--border); border-radius:14px; background:#fff; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    .mini-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+    .mini-title { font-weight:700; font-size:13px; }
+    .mini-total { font-size:12px; color:var(--muted); }
+    .mini-legend { list-style:none; margin:10px 0 0; padding:0; font-size:12px; }
+    .mini-legend li { display:flex; align-items:center; gap:8px; margin:4px 0; }
+    .mini-legend .count { margin-left:auto; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -77,11 +86,12 @@
 
   <nav class="tabs">
     <button class="tab active" data-tab="program-status">Patients By Program/Status</button>
-    <button class="tab" data-tab="tbd-2" disabled>— next report —</button>
+    <button class="tab" data-tab="current-active">Current Active Data</button>
     <button class="tab" data-tab="tbd-3" disabled>— next report —</button>
   </nav>
 
   <main>
+    <!-- Tab 1 -->
     <section class="card" id="tab-program-status">
       <h2 class="title">Patients By Program/Status</h2>
 
@@ -137,13 +147,25 @@
       </div>
     </section>
 
-    <section class="card" id="tab-tbd-2" style="display:none"><h2 class="title">Coming soon</h2></section>
+    <!-- Tab 2: Current Active Data by Program -->
+    <section class="card" id="tab-current-active" style="display:none">
+      <div class="grid-head">
+        <h2 class="title" style="margin:0">Current Active Data By Program</h2>
+        <div class="asof" id="asofGrid"></div>
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button class="btn btn-primary" id="refreshGridBtn" title="Reload charts">Refresh</button>
+      </div>
+      <div class="grid-charts" id="multiDonutGrid"></div>
+      <div id="gridMeta" class="muted" style="margin-top:10px"></div>
+    </section>
+
     <section class="card" id="tab-tbd-3" style="display:none"><h2 class="title">Coming soon</h2></section>
   </main>
 
   <script>
     // ===== Config =====
-    const curr_version = '1.12.2'; // add "as of" in chart title
+    const curr_version = '1.13.0'; // New Tab 2: Current Active Data by Program
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -153,16 +175,21 @@
 
     // Tabs
     document.querySelectorAll('.tab').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         if (btn.disabled) return;
         document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
         btn.classList.add('active');
-        document.getElementById('tab-' + btn.dataset.tab).style.display = '';
+        const targetId = 'tab-' + btn.dataset.tab;
+        document.getElementById(targetId).style.display = '';
+        if (targetId === 'tab-current-active') {
+          // Auto-render on open
+          renderActiveGrid();
+        }
       });
     });
 
-    // Elements
+    // Elements (Tab 1)
     const programEl   = document.getElementById('program');
     const programHint = document.getElementById('programHint');
     const recordTypeEl= document.getElementById('recordType');
@@ -178,7 +205,13 @@
     const progress    = document.getElementById('progress');
     const runBtn      = document.getElementById('runBtn');
     const clearBtn    = document.getElementById('clearBtn');
-    const asOfTitle   = document.getElementById('asOfTitle'); // NEW
+    const asOfTitle   = document.getElementById('asOfTitle');
+
+    // Elements (Tab 2)
+    const grid = document.getElementById('multiDonutGrid');
+    const asofGrid = document.getElementById('asofGrid');
+    const gridMeta = document.getElementById('gridMeta');
+    const refreshGridBtn = document.getElementById('refreshGridBtn');
 
     function setLoading(on){
       progress.style.width = on ? '90%' : '0%';
@@ -186,7 +219,7 @@
       runBtn.textContent = on ? 'Loading…' : 'Load Results';
     }
 
-    // Nice local timestamp (LA time by request)
+    // Nice local timestamp (Pacific time)
     function fmtAsOf(dt) {
       return new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Los_Angeles',
@@ -204,11 +237,13 @@
         programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
         programEl.value = 'ALL';
         programHint.classList.toggle('hidden', items.length <= 12);
+        return items;
       } catch (e) {
         programEl.innerHTML = `<option value="ALL">ALL</option>`;
         programEl.value = 'ALL';
         programHint.classList.add('hidden');
         meta.innerHTML = `<span class="error">Failed to load programs (${e.message})</span>`;
+        return ['ALL'];
       }
     }
 
@@ -260,6 +295,119 @@
       return { total, segments: entries };
     }
 
+    function renderDonutInto(container, donut){
+      // container is a .mini-card; create local svg + legend
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 200 200');
+      svg.setAttribute('class', 'donut-svg');
+
+      const box = document.createElement('div');
+      box.className = 'donut-box';
+      box.appendChild(svg);
+
+      const hole = document.createElement('div');
+      hole.className = 'donut-hole';
+      hole.innerHTML = `<div class="big">${donut.total}</div><div class="small">Total</div>`;
+      box.appendChild(hole);
+
+      container.appendChild(box);
+
+      const BOX = 200, cx=100, cy=100, r=70, stroke=26, C=2*Math.PI*r, GAP=2;
+      let offset = 0;
+      if (!donut.total || !donut.segments.length){
+        // empty donut
+      } else {
+        for (const seg of donut.segments){
+          const frac = seg.count / donut.total;
+          const dash = Math.max(frac * C - GAP, 0);
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+          circle.setAttribute('fill', 'none');
+          circle.setAttribute('stroke', seg.color);
+          circle.setAttribute('stroke-width', String(stroke));
+          circle.setAttribute('stroke-linecap', 'butt');
+          circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+          circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+          circle.setAttribute('stroke-dashoffset', String(-offset));
+          svg.appendChild(circle);
+          offset += dash + GAP;
+        }
+      }
+
+      // Legend (top 6 + remainder summary)
+      const leg = document.createElement('ul');
+      leg.className = 'mini-legend';
+      const maxItems = 6;
+      const shown = donut.segments.slice(0, maxItems);
+      shown.forEach(seg => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="swatch" style="background:${seg.color}"></span>
+                        <span>${seg.status}</span>
+                        <span class="count">${seg.count}</span>`;
+        leg.appendChild(li);
+      });
+      const hiddenCount = donut.segments.length - shown.length;
+      if (hiddenCount > 0){
+        const rest = donut.segments.slice(maxItems).reduce((a,b)=>a+b.count,0);
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="swatch" style="background:#e5e7eb"></span>
+                        <span>+${hiddenCount} more</span>
+                        <span class="count">${rest}</span>`;
+        leg.appendChild(li);
+      }
+      container.appendChild(leg);
+    }
+
+    // ---------- Tab 1 logic ----------
+    async function fetchRows(){
+      setLoading(true);
+      try {
+        const q = new URLSearchParams({
+          program: programEl.value || 'ALL',
+          recordType: recordTypeEl.value || 'ALL',
+        });
+        const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const rows = j.rows || [];
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
+          tfoot.style.display = 'none';
+          totalCell.textContent = '0';
+          renderDonutSVG({ total:0, segments:[] });
+        } else {
+          tbody.innerHTML = rows.map(x => `
+            <tr class="row">
+              <td>${x.program}</td>
+              <td>${x.status}</td>
+              <td>${x.count}</td>
+            </tr>`).join('');
+          const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
+          totalCell.textContent = total;
+          tfoot.style.display = '';
+
+          renderDonutSVG(buildDonut(rows));
+        }
+
+        if (asOfTitle) { asOfTitle.textContent = 'as of ' + fmtAsOf(new Date()); }
+
+        const totalShown = Number(totalCell.textContent || '0');
+        meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
+        source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
+        tfoot.style.display = 'none';
+        totalCell.textContent = '0';
+        renderDonutSVG({ total:0, segments:[] });
+        meta.textContent = '';
+        source.textContent = '';
+        if (asOfTitle) asOfTitle.textContent = '';
+      } finally {
+        setLoading(false);
+      }
+    }
+
     function renderDonutSVG({ total, segments }){
       if (!total || !segments.length) {
         chartSection.style.display = 'none';
@@ -269,13 +417,12 @@
         return;
       }
 
-      // Geometry fits inside viewBox (no clipping)
       const BOX = 200;
       const cx = 100, cy = 100;
-      const r = 70;            // radius (smaller)
-      const stroke = 26;       // ring thickness
+      const r = 70;
+      const stroke = 26;
       const C = 2 * Math.PI * r;
-      const GAP = 2;           // separation gap along arc
+      const GAP = 2;
 
       donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
       donutSvg.innerHTML = '';
@@ -310,58 +457,6 @@
       chartSection.style.display = 'block';
     }
 
-    async function fetchRows(){
-      setLoading(true);
-      try {
-        const q = new URLSearchParams({
-          program: programEl.value || 'ALL',
-          recordType: recordTypeEl.value || 'ALL',
-        });
-        const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        const rows = j.rows || [];
-
-        if (!rows.length) {
-          tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
-          tfoot.style.display = 'none';
-          totalCell.textContent = '0';
-          renderDonutSVG({ total:0, segments:[] });
-        } else {
-          tbody.innerHTML = rows.map(x => `
-            <tr class="row">
-              <td>${x.program}</td>
-              <td>${x.status}</td>
-              <td>${x.count}</td>
-            </tr>`).join('');
-          const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
-          totalCell.textContent = total;
-          tfoot.style.display = '';
-
-          renderDonutSVG(buildDonut(rows));
-        }
-
-        // NEW: put the as-of right in the chart title (after success)
-        if (asOfTitle) {
-          asOfTitle.textContent = 'as of ' + fmtAsOf(new Date());
-        }
-
-        const totalShown = Number(totalCell.textContent || '0');
-        meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
-        source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
-      } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
-        tfoot.style.display = 'none';
-        totalCell.textContent = '0';
-        renderDonutSVG({ total:0, segments:[] });
-        meta.textContent = '';
-        source.textContent = '';
-        if (asOfTitle) asOfTitle.textContent = ''; // clear on error
-      } finally {
-        setLoading(false);
-      }
-    }
-
     runBtn.addEventListener('click', fetchRows);
     clearBtn.addEventListener('click', () => {
       programEl.value = 'ALL';
@@ -372,8 +467,65 @@
       renderDonutSVG({ total:0, segments:[] });
       meta.textContent = '';
       source.textContent = '';
-      if (asOfTitle) asOfTitle.textContent = ''; // clear on reset
+      if (asOfTitle) asOfTitle.textContent = '';
     });
+
+    // ---------- Tab 2 logic ----------
+    async function fetchActiveRowsFor(program){
+      const q = new URLSearchParams({ program, recordType: 'Active' });
+      const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      return j.rows || [];
+    }
+
+    async function renderActiveGrid(){
+      try {
+        asofGrid.textContent = 'As of ' + fmtAsOf(new Date());
+        grid.innerHTML = '';
+        gridMeta.textContent = '';
+
+        // Get program list and build ordered list [ALL, ...alphabetical]
+        let programs = await fetchPrograms();
+        programs = Array.from(new Set(programs.filter(Boolean)));
+        programs.sort((a,b)=> a.localeCompare(b));
+        const ordered = ['ALL', ...programs.filter(p => p !== 'ALL')];
+
+        // Fetch all donuts in parallel
+        const results = await Promise.all(ordered.map(async (p) => {
+          try {
+            const rows = await fetchActiveRowsFor(p);
+            return { program: p, rows, donut: buildDonut(rows), ok:true };
+          } catch (e) {
+            return { program: p, rows: [], donut: { total:0, segments:[] }, ok:false, error:e };
+          }
+        }));
+
+        // Render tiles
+        let totalPrograms = 0, totalActive = 0;
+        for (const res of results){
+          const tile = document.createElement('div');
+          tile.className = 'mini-card';
+          const head = document.createElement('div');
+          head.className = 'mini-head';
+          head.innerHTML = `<div class="mini-title">${res.program}</div>
+                            <div class="mini-total">${res.donut.total} active</div>`;
+          tile.appendChild(head);
+
+          renderDonutInto(tile, res.donut);
+          grid.appendChild(tile);
+
+          totalPrograms += 1;
+          totalActive += (res.donut.total || 0);
+        }
+
+        gridMeta.textContent = `${totalPrograms} programs shown • ${totalActive} active total`;
+      } catch (e) {
+        grid.innerHTML = `<div class="error">Failed to load Current Active Data (${e.message})</div>`;
+      }
+    }
+
+    refreshGridBtn.addEventListener('click', renderActiveGrid);
 
     (async function init(){
       await fetchPrograms();
@@ -381,5 +533,3 @@
   </script>
 </body>
 </html>
-
-
