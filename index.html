@@ -22,20 +22,53 @@
     .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .title { font-size:16px; font-weight:700; margin:0 0 12px; }
 
-    /* Grid & Donut chart styles retained */
-    .grid-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:6px; }
-    .asof { font-size:12px; color:var(--muted); }
-    .grid-charts { display:grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap:16px; }
-    @media (max-width: 1280px) { .grid-charts { grid-template-columns: repeat(3, minmax(220px, 1fr)); } }
-    @media (max-width: 980px)  { .grid-charts { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
-    @media (max-width: 640px)  { .grid-charts { grid-template-columns: repeat(1, minmax(220px, 1fr)); } }
-    .mini-card { border:1px solid var(--border); border-radius:14px; background:#fff; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
-    .mini-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
-    .mini-title { font-weight:700; font-size:13px; }
-    .mini-total { font-size:12px; color:var(--muted); }
-    .mini-legend { list-style:none; margin:10px 0 0; padding:0; font-size:12px; }
-    .mini-legend li { display:flex; align-items:center; gap:8px; margin:4px 0; }
-    .mini-legend .count { margin-left:auto; color:var(--muted); }
+    /* Filters */
+    .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin:10px 0 8px; align-items:start; }
+    .filter-field { display:flex; flex-direction:column; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    select { width:100%; padding:10px 12px; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; }
+    .hint { font-size:11px; color:var(--muted); margin-top:4px; min-height:16px; }
+    .hint.hidden { visibility:hidden; }
+    .actions { display:flex; gap:10px; align-self:start; margin-top:22px; }
+    .btn { appearance:none; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; transition: transform .02s, box-shadow .15s; }
+    .btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.2); }
+    .btn-primary:hover { filter:brightness(1.03); }
+    .btn-primary:active { transform:translateY(1px); }
+    .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); }
+
+    .bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; width:0; transition:width .35s; margin:6px 0 2px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
+    th { color:var(--muted); font-weight:600; background:#fafbff; }
+    tr:nth-child(even) td { background:#fcfdff; }
+    tfoot td { background:#f3f6ff; font-weight:700; border-top:2px solid #c7d2fe; }
+    .footer { margin-top:10px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; background:#eef2ff; color:#3730a3; border:1px solid #e0e7ff; }
+    .error { color:#b91c1c; font-weight:600; }
+    .muted { color:var(--muted); }
+    .right { text-align:right; }
+
+    /* Donut (SVG) */
+    .chart-wrap { margin-top:14px; display:none; } /* JS sets to block when data exists */
+    .chart-title { font-weight:700; margin:6px 0 8px; color:#111827; }
+    .chart-flex { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
+    .donut-box { position:relative; width:180px; height:180px; }           /* smaller, no clipping */
+    .donut-svg { position:absolute; inset:0; }
+    .donut-hole {
+      position:absolute; inset:26%; background:var(--card); border-radius:50%;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      box-shadow: inset 0 0 0 1px var(--border);
+      text-align:center;
+    }
+    .donut-hole .big { font-size:20px; font-weight:800; }
+    .donut-hole .small { font-size:11px; color:var(--muted); margin-top:2px; }
+
+    .legend { list-style:none; margin:0; padding:0; columns:1; column-gap:18px; }
+    @media (min-width: 720px) { .legend { columns:2; } }
+    @media (min-width: 980px) { .legend { columns:3; } }
+    .legend li { break-inside:avoid; display:flex; align-items:center; gap:8px; margin:6px 0; }
+    .swatch { width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,.08); }
+    .legend .pct { color:var(--muted); margin-left:auto; padding-left:12px; }
   </style>
 </head>
 <body>
@@ -43,36 +76,308 @@
   <div id="version-line"></div>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="current-active">Current Active Data</button>
-    <button class="tab" data-tab="program-status">Patients By Program/Status</button>
+    <button class="tab active" data-tab="program-status">Patients By Program/Status</button>
+    <button class="tab" data-tab="tbd-2" disabled>— next report —</button>
     <button class="tab" data-tab="tbd-3" disabled>— next report —</button>
   </nav>
 
   <main>
-    <!-- Tab 1: Current Active Data moved first -->
-    <section class="card" id="tab-current-active">
-      <div class="grid-head">
-        <h2 class="title" style="margin:0">Current Active Data By Program</h2>
-        <div class="asof" id="asofGrid"></div>
-      </div>
-      <div class="actions" style="margin-top:0">
-        <button class="btn btn-primary" id="refreshGridBtn" title="Reload charts">Refresh</button>
-      </div>
-      <div class="grid-charts" id="multiDonutGrid"></div>
-      <div id="gridMeta" class="muted" style="margin-top:10px"></div>
-    </section>
-
-    <!-- Tab 2: Patients By Program/Status -->
-    <section class="card" id="tab-program-status" style="display:none">
+    <section class="card" id="tab-program-status">
       <h2 class="title">Patients By Program/Status</h2>
-      <!-- previous filter + table + chart remain unchanged -->
+
+      <div class="filters">
+        <div class="filter-field">
+          <label for="program">Program</label>
+          <select id="program"></select>
+          <div class="hint hidden" id="programHint">Scroll to see more programs</div>
+        </div>
+        <div class="filter-field">
+          <label for="recordType">Record Type</label>
+          <select id="recordType">
+            <option value="ALL">ALL</option>
+            <option value="Active">Active</option>
+            <option value="Non Active">Non Active</option>
+          </select>
+          <div class="hint hidden">&nbsp;</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="runBtn">Load Results</button>
+          <button class="btn btn-ghost" id="clearBtn" title="Reset filters">Reset</button>
+        </div>
+      </div>
+
+      <div id="progress" class="bar"></div>
+
+      <table>
+        <thead><tr><th>Program</th><th>Status</th><th>Count</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="3" class="muted">No results</td></tr></tbody>
+        <tfoot id="tfoot" style="display:none;"><tr><td class="right" colspan="2">Total</td><td id="totalCell">0</td></tr></tfoot>
+      </table>
+
+      <!-- Donut chart -->
+      <div id="chartSection" class="chart-wrap">
+        <div class="chart-title">
+          Status breakdown <span id="asOfTitle" class="muted"></span>
+        </div>
+        <div class="chart-flex">
+          <div class="donut-box">
+            <svg id="donutSvg" class="donut-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="donut-hole">
+              <div class="big" id="donutTotal">0</div>
+              <div class="small">Total</div>
+            </div>
+          </div>
+          <ul class="legend" id="legend"></ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div id="meta"></div>
+        <div><span class="pill" id="source"></span></div>
+      </div>
     </section>
 
+    <section class="card" id="tab-tbd-2" style="display:none"><h2 class="title">Coming soon</h2></section>
     <section class="card" id="tab-tbd-3" style="display:none"><h2 class="title">Coming soon</h2></section>
   </main>
 
   <script>
-    // unchanged JavaScript logic; only tab order swapped
+    // ===== Config =====
+    const curr_version = '1.12.2'; // add "as of" in chart title
+    const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('version-line');
+      if (el) el.textContent = `Version: ${curr_version}`;
+    });
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).style.display = '';
+      });
+    });
+
+    // Elements
+    const programEl   = document.getElementById('program');
+    const programHint = document.getElementById('programHint');
+    const recordTypeEl= document.getElementById('recordType');
+    const tbody       = document.getElementById('tbody');
+    const tfoot       = document.getElementById('tfoot');
+    const totalCell   = document.getElementById('totalCell');
+    const chartSection= document.getElementById('chartSection');
+    const donutSvg    = document.getElementById('donutSvg');
+    const donutTotal  = document.getElementById('donutTotal');
+    const legend      = document.getElementById('legend');
+    const meta        = document.getElementById('meta');
+    const source      = document.getElementById('source');
+    const progress    = document.getElementById('progress');
+    const runBtn      = document.getElementById('runBtn');
+    const clearBtn    = document.getElementById('clearBtn');
+    const asOfTitle   = document.getElementById('asOfTitle'); // NEW
+
+    function setLoading(on){
+      progress.style.width = on ? '90%' : '0%';
+      runBtn.disabled = !!on;
+      runBtn.textContent = on ? 'Loading…' : 'Load Results';
+    }
+
+    // Nice local timestamp (LA time by request)
+    function fmtAsOf(dt) {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(dt);
+    }
+
+    async function fetchPrograms(){
+      try {
+        const r = await fetch(`${API_BASE}/programs`, { method: 'GET' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const items = (j.programs || ['ALL']).filter(Boolean);
+        programEl.innerHTML = items.map(v => `<option value="${v}">${v}</option>`).join('');
+        programEl.value = 'ALL';
+        programHint.classList.toggle('hidden', items.length <= 12);
+      } catch (e) {
+        programEl.innerHTML = `<option value="ALL">ALL</option>`;
+        programEl.value = 'ALL';
+        programHint.classList.add('hidden');
+        meta.innerHTML = `<span class="error">Failed to load programs (${e.message})</span>`;
+      }
+    }
+
+    /* ---------- Deterministic color list ---------- */
+    const BRAND = ["#2563eb", "#16a34a"];
+    const WHEEL_SIZE = 48;
+    const wheel = makeWheel(WHEEL_SIZE, 72, 52);
+    const order = Array.from({length: WHEEL_SIZE}, (_, i) => (i * 13) % WHEEL_SIZE);
+    const orderedWheel = order.map(i => wheel[i]);
+    const PALETTE = [...BRAND, ...orderedWheel.filter(hex => !BRAND.includes(hex))];
+
+    function makeWheel(n, s = 70, l = 50) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const h = Math.round((i * 360) / n);
+        arr.push(hslToHex(h, s, l));
+      }
+      return arr;
+    }
+    function hslToHex(h, s, l) {
+      s/=100; l/=100;
+      const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=l-c/2;
+      let r=0,g=0,b=0;
+      if (h<60){r=c; g=x;}
+      else if (h<120){r=x; g=c;}
+      else if (h<180){g=c; b=x;}
+      else if (h<240){g=x; b=c;}
+      else if (h<300){r=x; b=c;}
+      else {r=c; b=x;}
+      const toHex=v=>Math.round((v+m)*255).toString(16).padStart(2,'0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    // ---------- Donut (SVG arcs with gaps) ----------
+    function buildDonut(rows){
+      const map = new Map();
+      for (const r of rows) {
+        const s = (r.status ?? "(blank)").toString();
+        const c = Number(r.count || 0);
+        map.set(s, (map.get(s) || 0) + c);
+      }
+      const total = Array.from(map.values()).reduce((a,b)=>a+b,0);
+      const entries = Array.from(map.entries())
+        .map(([status,count]) => ({ status, count }))
+        .sort((a,b)=> b.count - a.count);
+
+      // Sequential color assignment from the fixed palette
+      entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
+      return { total, segments: entries };
+    }
+
+    function renderDonutSVG({ total, segments }){
+      if (!total || !segments.length) {
+        chartSection.style.display = 'none';
+        donutSvg.innerHTML = '';
+        donutTotal.textContent = '0';
+        legend.innerHTML = '';
+        return;
+      }
+
+      // Geometry fits inside viewBox (no clipping)
+      const BOX = 200;
+      const cx = 100, cy = 100;
+      const r = 70;            // radius (smaller)
+      const stroke = 26;       // ring thickness
+      const C = 2 * Math.PI * r;
+      const GAP = 2;           // separation gap along arc
+
+      donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
+      donutSvg.innerHTML = '';
+
+      let offset = 0;
+      for (const seg of segments) {
+        const frac = seg.count / total;
+        const dash = Math.max(frac * C - GAP, 0);
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', '26');
+        circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+        circle.setAttribute('stroke-dashoffset', (-offset).toString());
+        donutSvg.appendChild(circle);
+        offset += dash + GAP;
+      }
+
+      donutTotal.textContent = total.toString();
+      legend.innerHTML = segments.map(seg => {
+        const pct = Math.round((seg.count/total)*100);
+        return `<li><span class="swatch" style="background:${seg.color}"></span>
+                  <span>${seg.status}</span>
+                  <span class="pct">${seg.count} (${pct}%)</span></li>`;
+      }).join('');
+
+      chartSection.style.display = 'block';
+    }
+
+    async function fetchRows(){
+      setLoading(true);
+      try {
+        const q = new URLSearchParams({
+          program: programEl.value || 'ALL',
+          recordType: recordTypeEl.value || 'ALL',
+        });
+        const r = await fetch(`${API_BASE}/totals?` + q.toString(), { method: 'GET' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const rows = j.rows || [];
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
+          tfoot.style.display = 'none';
+          totalCell.textContent = '0';
+          renderDonutSVG({ total:0, segments:[] });
+        } else {
+          tbody.innerHTML = rows.map(x => `
+            <tr class="row">
+              <td>${x.program}</td>
+              <td>${x.status}</td>
+              <td>${x.count}</td>
+            </tr>`).join('');
+          const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
+          totalCell.textContent = total;
+          tfoot.style.display = '';
+
+          renderDonutSVG(buildDonut(rows));
+        }
+
+        // NEW: put the as-of right in the chart title (after success)
+        if (asOfTitle) {
+          asOfTitle.textContent = 'as of ' + fmtAsOf(new Date());
+        }
+
+        const totalShown = Number(totalCell.textContent || '0');
+        meta.textContent = rows.length ? `${totalShown} total across ${rows.length} groups` : '';
+        source.textContent = j.source === 'db-aggregated' ? 'DB aggregated' : 'Worker grouped';
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
+        tfoot.style.display = 'none';
+        totalCell.textContent = '0';
+        renderDonutSVG({ total:0, segments:[] });
+        meta.textContent = '';
+        source.textContent = '';
+        if (asOfTitle) asOfTitle.textContent = ''; // clear on error
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    runBtn.addEventListener('click', fetchRows);
+    clearBtn.addEventListener('click', () => {
+      programEl.value = 'ALL';
+      recordTypeEl.value = 'ALL';
+      tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
+      tfoot.style.display = 'none';
+      totalCell.textContent = '0';
+      renderDonutSVG({ total:0, segments:[] });
+      meta.textContent = '';
+      source.textContent = '';
+      if (asOfTitle) asOfTitle.textContent = ''; // clear on reset
+    });
+
+    (async function init(){
+      await fetchPrograms();
+    })();
   </script>
 </body>
 </html>
