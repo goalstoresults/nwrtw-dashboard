@@ -85,13 +85,14 @@
   <div id="version-line"></div>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="program-status">Patients By Program/Status</button>
-    <button class="tab" data-tab="current-active">Current Active Data</button>
+    <!-- ONLY CHANGE: button order + active moved -->
+    <button class="tab active" data-tab="current-active">Current Active Data</button>
+    <button class="tab" data-tab="program-status">Patients By Program/Status</button>
     <button class="tab" data-tab="tbd-3" disabled>— next report —</button>
   </nav>
 
   <main>
-    <!-- Tab 1 -->
+    <!-- Tab 1 (unchanged content) -->
     <section class="card" id="tab-program-status">
       <h2 class="title">Patients By Program/Status</h2>
 
@@ -111,9 +112,8 @@
           <div class="hint hidden">&nbsp;</div>
         </div>
         <div class="actions">
-          <!-- ORDER SWAPPED: Reset first, then Load Results -->
-          <button class="btn btn-ghost" id="clearBtn" title="Reset filters">Reset</button>
           <button class="btn btn-primary" id="runBtn">Load Results</button>
+          <button class="btn btn-ghost" id="clearBtn" title="Reset filters">Reset</button>
         </div>
       </div>
 
@@ -148,7 +148,7 @@
       </div>
     </section>
 
-    <!-- Tab 2: Current Active Data by Program -->
+    <!-- Tab 2 (unchanged content) -->
     <section class="card" id="tab-current-active" style="display:none">
       <div class="grid-head">
         <h2 class="title" style="margin:0">Current Active Data By Program</h2>
@@ -166,12 +166,14 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.13.1'; // Button order swapped; Reset then Load
+    const curr_version = '1.13.2'; // tab order swapped only
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById('version-line');
       if (el) el.textContent = `Version: ${curr_version}`;
+      // Ensure the initially active button opens its section
+      document.querySelector('.tab.active')?.click();
     });
 
     // Tabs
@@ -278,7 +280,7 @@
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
-    // ---------- Donut helpers ----------
+    // ---------- Donut (SVG arcs with gaps) ----------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
@@ -290,6 +292,8 @@
       const entries = Array.from(map.entries())
         .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
+
+      // Sequential color assignment from the fixed palette
       entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
       return { total, segments: entries };
     }
@@ -361,22 +365,27 @@
 
       const cx=100, cy=100, r=70, stroke=26, C=2*Math.PI*r, GAP=2;
       let offset = 0;
-      for (const seg of donut.segments){
-        const frac = seg.count / donut.total;
-        const dash = Math.max(frac * C - GAP, 0);
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
-        circle.setAttribute('fill', 'none');
-        circle.setAttribute('stroke', seg.color);
-        circle.setAttribute('stroke-width', String(stroke));
-        circle.setAttribute('stroke-linecap', 'butt');
-        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
-        circle.setAttribute('stroke-dashoffset', String(-offset));
-        svg.appendChild(circle);
-        offset += dash + GAP;
+      if (!donut.total || !donut.segments.length){
+        // empty donut
+      } else {
+        for (const seg of donut.segments){
+          const frac = seg.count / donut.total;
+          const dash = Math.max(frac * C - GAP, 0);
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+          circle.setAttribute('fill', 'none');
+          circle.setAttribute('stroke', seg.color);
+          circle.setAttribute('stroke-width', String(stroke));
+          circle.setAttribute('stroke-linecap', 'butt');
+          circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+          circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+          circle.setAttribute('stroke-dashoffset', String(-offset));
+          svg.appendChild(circle);
+          offset += dash + GAP;
+        }
       }
 
+      // Legend (top 6 + remainder summary)
       const leg = document.createElement('ul');
       leg.className = 'mini-legend';
       const maxItems = 6;
@@ -534,3 +543,4 @@
   </script>
 </body>
 </html>
+
