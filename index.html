@@ -111,8 +111,9 @@
           <div class="hint hidden">&nbsp;</div>
         </div>
         <div class="actions">
-          <button class="btn btn-primary" id="runBtn">Load Results</button>
+          <!-- ORDER SWAPPED: Reset first, then Load Results -->
           <button class="btn btn-ghost" id="clearBtn" title="Reset filters">Reset</button>
+          <button class="btn btn-primary" id="runBtn">Load Results</button>
         </div>
       </div>
 
@@ -165,7 +166,7 @@
 
   <script>
     // ===== Config =====
-    const curr_version = '1.13.0'; // New Tab 2: Current Active Data by Program
+    const curr_version = '1.13.1'; // Button order swapped; Reset then Load
     const API_BASE = 'https://nwrtw-program-status-totals.dennis-e64.workers.dev';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -277,7 +278,7 @@
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
-    // ---------- Donut (SVG arcs with gaps) ----------
+    // ---------- Donut helpers ----------
     function buildDonut(rows){
       const map = new Map();
       for (const r of rows) {
@@ -289,14 +290,60 @@
       const entries = Array.from(map.entries())
         .map(([status,count]) => ({ status, count }))
         .sort((a,b)=> b.count - a.count);
-
-      // Sequential color assignment from the fixed palette
       entries.forEach((e, i) => { e.color = PALETTE[i % PALETTE.length]; });
       return { total, segments: entries };
     }
 
+    function renderDonutSVG({ total, segments }){
+      if (!total || !segments.length) {
+        chartSection.style.display = 'none';
+        donutSvg.innerHTML = '';
+        donutTotal.textContent = '0';
+        legend.innerHTML = '';
+        return;
+      }
+
+      const BOX = 200;
+      const cx = 100, cy = 100;
+      const r = 70;
+      const stroke = 26;
+      const C = 2 * Math.PI * r;
+      const GAP = 2;
+
+      donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
+      donutSvg.innerHTML = '';
+
+      let offset = 0;
+      for (const seg of segments) {
+        const frac = seg.count / total;
+        const dash = Math.max(frac * C - GAP, 0);
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', String(stroke));
+        circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+        circle.setAttribute('stroke-dashoffset', String(-offset));
+        donutSvg.appendChild(circle);
+        offset += dash + GAP;
+      }
+
+      donutTotal.textContent = String(total);
+      legend.innerHTML = segments.map(seg => {
+        const pct = Math.round((seg.count/total)*100);
+        return `<li><span class="swatch" style="background:${seg.color}"></span>
+                  <span>${seg.status}</span>
+                  <span class="pct">${seg.count} (${pct}%)</span></li>`;
+      }).join('');
+
+      chartSection.style.display = 'block';
+    }
+
     function renderDonutInto(container, donut){
-      // container is a .mini-card; create local svg + legend
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 200 200');
       svg.setAttribute('class', 'donut-svg');
@@ -312,29 +359,24 @@
 
       container.appendChild(box);
 
-      const BOX = 200, cx=100, cy=100, r=70, stroke=26, C=2*Math.PI*r, GAP=2;
+      const cx=100, cy=100, r=70, stroke=26, C=2*Math.PI*r, GAP=2;
       let offset = 0;
-      if (!donut.total || !donut.segments.length){
-        // empty donut
-      } else {
-        for (const seg of donut.segments){
-          const frac = seg.count / donut.total;
-          const dash = Math.max(frac * C - GAP, 0);
-          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
-          circle.setAttribute('fill', 'none');
-          circle.setAttribute('stroke', seg.color);
-          circle.setAttribute('stroke-width', String(stroke));
-          circle.setAttribute('stroke-linecap', 'butt');
-          circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-          circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
-          circle.setAttribute('stroke-dashoffset', String(-offset));
-          svg.appendChild(circle);
-          offset += dash + GAP;
-        }
+      for (const seg of donut.segments){
+        const frac = seg.count / donut.total;
+        const dash = Math.max(frac * C - GAP, 0);
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', seg.color);
+        circle.setAttribute('stroke-width', String(stroke));
+        circle.setAttribute('stroke-linecap', 'butt');
+        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
+        circle.setAttribute('stroke-dashoffset', String(-offset));
+        svg.appendChild(circle);
+        offset += dash + GAP;
       }
 
-      // Legend (top 6 + remainder summary)
       const leg = document.createElement('ul');
       leg.className = 'mini-legend';
       const maxItems = 6;
@@ -374,8 +416,11 @@
         if (!rows.length) {
           tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
           tfoot.style.display = 'none';
+          chartSection.style.display = 'none';
+          donutSvg.innerHTML = '';
+          donutTotal.textContent = '0';
+          legend.innerHTML = '';
           totalCell.textContent = '0';
-          renderDonutSVG({ total:0, segments:[] });
         } else {
           tbody.innerHTML = rows.map(x => `
             <tr class="row">
@@ -386,7 +431,6 @@
           const total = rows.reduce((a,b)=>a + (Number(b.count)||0), 0);
           totalCell.textContent = total;
           tfoot.style.display = '';
-
           renderDonutSVG(buildDonut(rows));
         }
 
@@ -398,63 +442,17 @@
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="3" class="error">Failed to load totals (${e.message})</td></tr>`;
         tfoot.style.display = 'none';
-        totalCell.textContent = '0';
-        renderDonutSVG({ total:0, segments:[] });
-        meta.textContent = '';
-        source.textContent = '';
-        if (asOfTitle) asOfTitle.textContent = '';
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    function renderDonutSVG({ total, segments }){
-      if (!total || !segments.length) {
         chartSection.style.display = 'none';
         donutSvg.innerHTML = '';
         donutTotal.textContent = '0';
         legend.innerHTML = '';
-        return;
+        meta.textContent = '';
+        source.textContent = '';
+        totalCell.textContent = '0';
+        if (asOfTitle) asOfTitle.textContent = '';
+      } finally {
+        setLoading(false);
       }
-
-      const BOX = 200;
-      const cx = 100, cy = 100;
-      const r = 70;
-      const stroke = 26;
-      const C = 2 * Math.PI * r;
-      const GAP = 2;
-
-      donutSvg.setAttribute('viewBox', `0 0 ${BOX} ${BOX}`);
-      donutSvg.innerHTML = '';
-
-      let offset = 0;
-      for (const seg of segments) {
-        const frac = seg.count / total;
-        const dash = Math.max(frac * C - GAP, 0);
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', cx);
-        circle.setAttribute('cy', cy);
-        circle.setAttribute('r', r);
-        circle.setAttribute('fill', 'none');
-        circle.setAttribute('stroke', seg.color);
-        circle.setAttribute('stroke-width', stroke.toString());
-        circle.setAttribute('stroke-linecap', 'butt');
-        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-        circle.setAttribute('stroke-dasharray', `${dash} ${C}`);
-        circle.setAttribute('stroke-dashoffset', (-offset).toString());
-        donutSvg.appendChild(circle);
-        offset += dash + GAP;
-      }
-
-      donutTotal.textContent = total.toString();
-      legend.innerHTML = segments.map(seg => {
-        const pct = Math.round((seg.count/total)*100);
-        return `<li><span class="swatch" style="background:${seg.color}"></span>
-                  <span>${seg.status}</span>
-                  <span class="pct">${seg.count} (${pct}%)</span></li>`;
-      }).join('');
-
-      chartSection.style.display = 'block';
     }
 
     runBtn.addEventListener('click', fetchRows);
@@ -463,10 +461,13 @@
       recordTypeEl.value = 'ALL';
       tbody.innerHTML = `<tr><td colspan="3" class="muted">No results</td></tr>`;
       tfoot.style.display = 'none';
-      totalCell.textContent = '0';
-      renderDonutSVG({ total:0, segments:[] });
+      chartSection.style.display = 'none';
+      donutSvg.innerHTML = '';
+      donutTotal.textContent = '0';
+      legend.innerHTML = '';
       meta.textContent = '';
       source.textContent = '';
+      totalCell.textContent = '0';
       if (asOfTitle) asOfTitle.textContent = '';
     });
 
